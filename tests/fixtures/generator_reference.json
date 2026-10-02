@@ -1,0 +1,448 @@
+{
+  "provenance": "Captured from original JS generator before Python migration, 2026-10-02. Fictional data only. XML canonicalization excludes declaration/empty-element spelling, not document structure.",
+  "cases": [
+    {
+      "name": "sample",
+      "data": {
+        "company": {
+          "nameKo": "가온식품(테스트)",
+          "nameEn": "GAON FOODS TEST",
+          "registrationNumber": "",
+          "representative": "테스트 대표",
+          "address": "",
+          "department": "해외영업팀",
+          "category": "중소기업"
+        },
+        "contact": {
+          "name": "테스트 담당자",
+          "phone": "",
+          "email": "sales@example.com"
+        },
+        "manager": {
+          "name": "",
+          "phone": "",
+          "email": ""
+        },
+        "provider": {
+          "name": "",
+          "contact": "",
+          "phone": ""
+        },
+        "projectType": "라벨",
+        "applicationDate": "",
+        "products": [
+          {
+            "brandKo": "가온",
+            "brandEn": "GAON",
+            "nameKo": "현미 과자(테스트)",
+            "nameEn": "BROWN RICE SNACK TEST",
+            "category": "가공식품",
+            "exportScale": "",
+            "certificationHeld": "",
+            "certifications": "",
+            "trademarks": "",
+            "productionLocation": "국내생산",
+            "productionType": "위탁생산(OEM/ODM)",
+            "countries": [
+              {
+                "country": "일본",
+                "trademarkStatus": "",
+                "trademarkNumberOrReason": "",
+                "quantity": "",
+                "method": "라벨"
+              }
+            ],
+            "factories": [
+              {
+                "country": "대한민국",
+                "productionType": "위탁생산(OEM/ODM)"
+              }
+            ]
+          }
+        ],
+        "plan": {
+          "counterfeitRisk": "[테스트 예시] 유사 상품과의 혼동을 줄이기 위한 표시 방안을 검토합니다. 실제 위조 피해 발생 여부와 사례는 고객사 확인이 필요합니다.",
+          "ipDefense": "[테스트 예시] 국가별 상표 출원·등록 현황과 권리 보호 담당 체계를 확인한 뒤 대응 계획을 구체화합니다.",
+          "countries": "[테스트 예시] 일본. 실제 사업 대상국과 판매 현황은 고객사 확인이 필요합니다.",
+          "channelPlan": "[테스트 예시] 선택한 활용채널에 인증상표를 적용하는 방안을 검토합니다. 적용 위치·수량·일정은 확인 후 확정합니다.",
+          "marketing": "[테스트 예시] 현지 유통채널에 제품 정보를 일관되게 제공하고 소비자 안내 자료를 정비하는 방안을 제안합니다.",
+          "expectedEffects": "[테스트 예시] 제품 식별과 소비자 정보 전달 개선을 기대합니다. 매출·수출 증가 수치는 근거 확인 전 기재하지 않습니다.",
+          "improvement": "[테스트 예시] 상표 표시 기준과 담당자 점검 절차를 정리하는 방안을 제안합니다. 분쟁 이력은 별도 확인이 필요합니다.",
+          "channels": [
+            "포장",
+            "온라인몰"
+          ],
+          "ipHistory": ""
+        }
+      },
+      "files": [
+        {
+          "filename": "가온식품(테스트)_사용신청서_검토용.hwpx",
+          "sectionSHA256": "6944f68e8e1d0121a08ea89980e1869ed27d8b7b7bc5ffa6d8c2ec48e65d2bc5",
+          "previewSHA256": "fabc7c1b500b25ea6fb00c0a6219ed59a215540d4809801f3e6a9fcecf75d99c",
+          "warnings": [
+            "사업자번호: 확인 필요",
+            "주소: 확인 필요",
+            "담당자 연락처: 확인 필요",
+            "부서장: 확인 필요",
+            "부서장 연락처: 확인 필요",
+            "부서장 이메일: 확인 필요",
+            "희망 수행업체: 확인 필요",
+            "수행업체 담당자: 확인 필요",
+            "수행업체 연락처: 확인 필요",
+            "수출규모(단위·기간 포함): 확인 필요",
+            "보유인증: 확인 필요",
+            "상표현황: 확인 필요",
+            "사진 자동 삽입 미구현: 한글에서 상품 전면·후면 사진을 추가해야 합니다.",
+            "인증 보유 여부: 선택 확인 필요",
+            "국가별 상표상태: 선택 확인 필요",
+            "상표번호/미출원 사유: 확인 필요",
+            "부착 예정수량: 확인 필요",
+            "신청일 미입력: 원본의 날짜 빈칸 유지",
+            "고객사 개인정보 동의·서명·직인은 자동 작성하지 않았습니다."
+          ],
+          "validation": {
+            "zipCRC": "pass",
+            "xmlFilesParsed": 8,
+            "styleReferences": "pass",
+            "manifestReferences": "pass",
+            "sectionCount": 1,
+            "tableCount": 5,
+            "verifiedCells": 42,
+            "mimetypeFirstStored": true,
+            "unchangedPackageEntries": "pass"
+          }
+        },
+        {
+          "filename": "가온식품(테스트)_활용계획서_검토용.hwpx",
+          "sectionSHA256": "0735cba4edeb338efc1be461129f1f5c84090563a68a5f9fdc40eac53fc1ae53",
+          "previewSHA256": "02d31552eee40a5c990e66d6fb3ac634df435a7bd9469fa6503171b4b4c13b7b",
+          "warnings": [
+            "분쟁 이력: 선택 확인 필요",
+            "신청일 미입력: 원본의 날짜 빈칸 유지",
+            "고객사 개인정보 동의·서명·직인은 자동 작성하지 않았습니다."
+          ],
+          "validation": {
+            "zipCRC": "pass",
+            "xmlFilesParsed": 8,
+            "styleReferences": "pass",
+            "manifestReferences": "pass",
+            "sectionCount": 1,
+            "tableCount": 3,
+            "verifiedCells": 9,
+            "mimetypeFirstStored": true,
+            "unchangedPackageEntries": "pass"
+          }
+        }
+      ]
+    },
+    {
+      "name": "full",
+      "data": {
+        "company": {
+          "nameKo": "대조 & <테스트> 😀",
+          "nameEn": "GAON FOODS TEST",
+          "registrationNumber": "",
+          "representative": "테스트 대표",
+          "address": "",
+          "department": "해외영업팀",
+          "category": "중소기업"
+        },
+        "contact": {
+          "name": "테스트 담당자",
+          "phone": "",
+          "email": "sales@example.com"
+        },
+        "manager": {
+          "name": "",
+          "phone": "",
+          "email": ""
+        },
+        "provider": {
+          "name": "",
+          "contact": "",
+          "phone": ""
+        },
+        "projectType": "라벨",
+        "applicationDate": "2026-10-02",
+        "products": [
+          {
+            "brandKo": "가온",
+            "brandEn": "GAON",
+            "nameKo": "현미 과자(테스트)",
+            "nameEn": "BROWN RICE SNACK TEST",
+            "category": "가공식품",
+            "exportScale": "",
+            "certificationHeld": "",
+            "certifications": "",
+            "trademarks": "",
+            "productionLocation": "국내생산",
+            "productionType": "위탁생산(OEM/ODM)",
+            "countries": [
+              {
+                "country": "일본",
+                "trademarkStatus": "등록완료",
+                "trademarkNumberOrReason": "이유 & 번호",
+                "quantity": "100개",
+                "method": "맞춤제작"
+              },
+              {
+                "country": "미국",
+                "trademarkStatus": "출원중",
+                "trademarkNumberOrReason": "이유 & 번호",
+                "quantity": "100개",
+                "method": "맞춤제작"
+              },
+              {
+                "country": "독일",
+                "trademarkStatus": "미출원",
+                "trademarkNumberOrReason": "이유 & 번호",
+                "quantity": "100개",
+                "method": "맞춤제작"
+              }
+            ],
+            "factories": [
+              {
+                "country": "국가0",
+                "productionType": "자체생산"
+              },
+              {
+                "country": "국가1",
+                "productionType": "자체생산"
+              },
+              {
+                "country": "국가2",
+                "productionType": "자체생산"
+              },
+              {
+                "country": "국가3",
+                "productionType": "자체생산"
+              }
+            ]
+          }
+        ],
+        "plan": {
+          "counterfeitRisk": "counterfeitRisk 첫 줄 & <문자>\n둘째 줄 😀",
+          "ipDefense": "ipDefense 첫 줄 & <문자>\n둘째 줄 😀",
+          "countries": "countries 첫 줄 & <문자>\n둘째 줄 😀",
+          "channelPlan": "channelPlan 첫 줄 & <문자>\n둘째 줄 😀",
+          "marketing": "marketing 첫 줄 & <문자>\n둘째 줄 😀",
+          "expectedEffects": "expectedEffects 첫 줄 & <문자>\n둘째 줄 😀",
+          "improvement": "improvement 첫 줄 & <문자>\n둘째 줄 😀",
+          "channels": [
+            "제품",
+            "포장",
+            "온라인몰",
+            "홈페이지/SNS",
+            "전시·박람회",
+            "기타"
+          ],
+          "ipHistory": "없음"
+        }
+      },
+      "files": [
+        {
+          "filename": "대조 & _테스트_ 😀_사용신청서_검토용.hwpx",
+          "sectionSHA256": "9a671e2a81c4129a7b377b5b3c3fdfb15e021e926b0d5c1d9eec5b4f102f158a",
+          "previewSHA256": "11857313b3030818db2be9805f11dcc6a6f2d080723df29777a7d9ab04203ea4",
+          "warnings": [
+            "사업자번호: 확인 필요",
+            "주소: 확인 필요",
+            "담당자 연락처: 확인 필요",
+            "부서장: 확인 필요",
+            "부서장 연락처: 확인 필요",
+            "부서장 이메일: 확인 필요",
+            "희망 수행업체: 확인 필요",
+            "수행업체 담당자: 확인 필요",
+            "수행업체 연락처: 확인 필요",
+            "수출규모(단위·기간 포함): 확인 필요",
+            "보유인증: 확인 필요",
+            "상표현황: 확인 필요",
+            "사진 자동 삽입 미구현: 한글에서 상품 전면·후면 사진을 추가해야 합니다.",
+            "인증 보유 여부: 선택 확인 필요",
+            "고객사 개인정보 동의·서명·직인은 자동 작성하지 않았습니다."
+          ],
+          "validation": {
+            "zipCRC": "pass",
+            "xmlFilesParsed": 8,
+            "styleReferences": "pass",
+            "manifestReferences": "pass",
+            "sectionCount": 1,
+            "tableCount": 5,
+            "verifiedCells": 65,
+            "mimetypeFirstStored": true,
+            "unchangedPackageEntries": "pass"
+          }
+        },
+        {
+          "filename": "대조 & _테스트_ 😀_활용계획서_검토용.hwpx",
+          "sectionSHA256": "4f389ecdf8e6504aaec9a1c1076c5f4808d5367e0db7df2e5dcc365dfd6fbd54",
+          "previewSHA256": "8af7bc488267a02fee8421e95fccb4b289bbbde26e2b957a4061064eaddc4b39",
+          "warnings": [
+            "고객사 개인정보 동의·서명·직인은 자동 작성하지 않았습니다."
+          ],
+          "validation": {
+            "zipCRC": "pass",
+            "xmlFilesParsed": 8,
+            "styleReferences": "pass",
+            "manifestReferences": "pass",
+            "sectionCount": 1,
+            "tableCount": 3,
+            "verifiedCells": 9,
+            "mimetypeFirstStored": true,
+            "unchangedPackageEntries": "pass"
+          }
+        }
+      ]
+    },
+    {
+      "name": "minimal",
+      "data": {
+        "company": {
+          "nameKo": "최소 입력",
+          "nameEn": "",
+          "registrationNumber": "",
+          "representative": "",
+          "address": "",
+          "department": "",
+          "category": ""
+        },
+        "contact": {
+          "name": "",
+          "phone": "",
+          "email": ""
+        },
+        "manager": {
+          "name": "",
+          "phone": "",
+          "email": ""
+        },
+        "provider": {
+          "name": "",
+          "contact": "",
+          "phone": ""
+        },
+        "projectType": "",
+        "applicationDate": "",
+        "products": [
+          {
+            "brandKo": "",
+            "brandEn": "",
+            "nameKo": "",
+            "nameEn": "",
+            "category": "",
+            "exportScale": "",
+            "certificationHeld": "",
+            "certifications": "",
+            "trademarks": "",
+            "productionLocation": "",
+            "productionType": "",
+            "countries": [],
+            "factories": []
+          }
+        ],
+        "plan": {
+          "counterfeitRisk": "",
+          "ipDefense": "",
+          "countries": "",
+          "channelPlan": "",
+          "marketing": "",
+          "expectedEffects": "",
+          "improvement": "",
+          "channels": [],
+          "ipHistory": ""
+        }
+      },
+      "files": [
+        {
+          "filename": "최소 입력_사용신청서_검토용.hwpx",
+          "sectionSHA256": "adfb4f7bd5485fe7de895998e75af693c37618afb28eb202491c0fc920e80a5e",
+          "previewSHA256": "2ab2dac60d75079115603919db364dbe911838f37c052f2f1b508b6f1e84458c",
+          "warnings": [
+            "기업명(영문): 확인 필요",
+            "사업자번호: 확인 필요",
+            "대표자: 확인 필요",
+            "주소: 확인 필요",
+            "담당부서: 확인 필요",
+            "담당자: 확인 필요",
+            "담당자 연락처: 확인 필요",
+            "담당자 이메일: 확인 필요",
+            "부서장: 확인 필요",
+            "부서장 연락처: 확인 필요",
+            "부서장 이메일: 확인 필요",
+            "기업구분: 선택 확인 필요",
+            "사업과제: 선택 확인 필요",
+            "희망 수행업체: 확인 필요",
+            "수행업체 담당자: 확인 필요",
+            "수행업체 연락처: 확인 필요",
+            "사용국가: 확인 필요",
+            "수출규모(단위·기간 포함): 확인 필요",
+            "브랜드 국문: 확인 필요",
+            "상품 국문: 확인 필요",
+            "브랜드 영문: 확인 필요",
+            "상품 영문: 확인 필요",
+            "상품분류: 확인 필요",
+            "보유인증: 확인 필요",
+            "상표현황: 확인 필요",
+            "사진 자동 삽입 미구현: 한글에서 상품 전면·후면 사진을 추가해야 합니다.",
+            "인증 보유 여부: 선택 확인 필요",
+            "생산지: 선택 확인 필요",
+            "생산형태: 선택 확인 필요",
+            "공장 제조국: 확인 필요",
+            "공장 생산형태: 확인 필요",
+            "브랜드: 확인 필요",
+            "상품: 확인 필요",
+            "국가별 상표상태: 선택 확인 필요",
+            "상표번호/미출원 사유: 확인 필요",
+            "부착 예정수량: 확인 필요",
+            "국가별 사용방식: 선택 확인 필요",
+            "상품명: 확인 필요",
+            "신청일 미입력: 원본의 날짜 빈칸 유지",
+            "고객사 개인정보 동의·서명·직인은 자동 작성하지 않았습니다."
+          ],
+          "validation": {
+            "zipCRC": "pass",
+            "xmlFilesParsed": 8,
+            "styleReferences": "pass",
+            "manifestReferences": "pass",
+            "sectionCount": 1,
+            "tableCount": 5,
+            "verifiedCells": 42,
+            "mimetypeFirstStored": true,
+            "unchangedPackageEntries": "pass"
+          }
+        },
+        {
+          "filename": "최소 입력_활용계획서_검토용.hwpx",
+          "sectionSHA256": "77bfcc2a15f0de5affcb14f90055ce74b0b661b79fbc53d44f37570b8c3f6155",
+          "previewSHA256": "dd2d9d103a98eda89f030646f0740d4568cac1a9dab1ee1888de640b07082b70",
+          "warnings": [
+            "위조 피해·우려: 확인 필요",
+            "해외 IP·방어역량: 확인 필요",
+            "활용국가: 확인 필요",
+            "활용채널 상세: 확인 필요",
+            "수출 마케팅 전략: 확인 필요",
+            "기대효과: 확인 필요",
+            "개선계획: 확인 필요",
+            "활용채널: 선택 확인 필요",
+            "분쟁 이력: 선택 확인 필요",
+            "대표자: 확인 필요",
+            "신청일 미입력: 원본의 날짜 빈칸 유지",
+            "고객사 개인정보 동의·서명·직인은 자동 작성하지 않았습니다."
+          ],
+          "validation": {
+            "zipCRC": "pass",
+            "xmlFilesParsed": 8,
+            "styleReferences": "pass",
+            "manifestReferences": "pass",
+            "sectionCount": 1,
+            "tableCount": 3,
+            "verifiedCells": 9,
+            "mimetypeFirstStored": true,
+            "unchangedPackageEntries": "pass"
+          }
+        }
+      ]
+    }
+  ]
+}
