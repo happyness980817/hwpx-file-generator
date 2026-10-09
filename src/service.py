@@ -12,7 +12,17 @@ from .hwpx import generate, validate_input
 from .models import fingerprint
 
 
-def generate_documents(data: dict, output_root: Path | None = None) -> dict:
+def generate_documents(data: dict, output_root: Path | None = None, *, temporary=False) -> dict:
+    if temporary:
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory(prefix="kbrand-") as folder:
+            result = _generate_documents(data, Path(folder))
+            result["folder"] = ""
+            return result
+    return _generate_documents(data, output_root)
+
+
+def _generate_documents(data: dict, output_root: Path | None = None) -> dict:
     validate_input(data)
     try:
         input_bytes = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")

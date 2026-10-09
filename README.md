@@ -1,60 +1,77 @@
-# K-브랜드 문서 작업실
+# K-브랜드 신청서 도우미
 
-고객사 정보를 입력하고 활용계획서 문안을 검토한 뒤, 원본 양식에 채운 HWPX 두 개와 ZIP을 다운로드하는 **Python + Streamlit** 앱입니다. HWPX 생성에는 Python 표준 라이브러리만 사용하므로 Node.js와 한글 프로그램 설치가 필요하지 않습니다.
+고객이 회사소개서·제품 자료를 올리면 AI가 정보를 추출해 사용신청서와 도입 필요성 및 활용계획서의 초안을 작성하는 **Python + Streamlit** 사이트입니다. 가입·아이디 로그인은 없습니다.
 
-## 시작하기
+## 사용자 흐름
 
-`C:\notion-workspace-writer-agent`에서 실행합니다.
+1. 자료 업로드 또는 회사·제품 설명 입력 → 자료 전송 동의 → **자료에서 초안 만들기**.
+2. 추출 결과와 확인 질문을 검토합니다. 대화로 수정을 요청하거나 **세부 정보 수정**에서 모든 항목을 직접 편집합니다.
+3. **한글파일 두 개 만들기** → HWPX 개별 다운로드 또는 ZIP 다운로드.
+4. 이어서 작성하려면 **작업 저장 · 확인 비밀번호 발급**을 누르고 작업번호와 비밀번호를 보관합니다. 재방문 시 **작업 열기**로 불러옵니다. 수정 후 다시 저장해야 합니다.
+
+확인 비밀번호는 해당 작업에 접근하기 위한 비밀값이며 실명인증이 아닙니다. 이 정보를 분실하면 복구할 수 없습니다. 기존 sales01/admin 계정은 고객 사이트에서 사용하지 않으며 원격 Auth 계정을 삭제하지는 않습니다.
+
+## 실행
 
 ```powershell
-uv sync
+uv sync --locked
 uv run streamlit run app.py
 ```
 
-브라우저: <http://127.0.0.1:8501>. Windows에서는 `dev.cmd`로도 실행할 수 있습니다. 종료는 실행 터미널에서 `Ctrl+C`입니다. 포트가 사용 중이면 기존 서버를 종료하거나 `uv run streamlit run app.py --server.port 8502`로 실행하세요.
+브라우저: http://127.0.0.1:8501. `dev.cmd`는 로컬 주소에서 실행합니다.
 
-현재 프로젝트에는 `admin`, `sales01`, `sales02` 로그인이 준비되어 있습니다. 초기 비밀번호 위치와 새 환경 설정은 [로그인 설정 매뉴얼](LOGIN_SETUP.md)을 참고하세요. 로그인 후에는 OpenAI API 키 없이도 가상 고객 자료 → 테스트 예시 문안 → 파일 생성·다운로드를 시험할 수 있습니다. 현재 이 PC의 OpenAI 연결도 설정되어 있으며 `gpt-6-luna`로 실제 문안 작성과 HWPX 두 개·ZIP 생성을 검증했습니다(2026-10-02). 화면에서 자료 전송에 동의한 뒤 **AI로 문안 작성**을 누르시면 됩니다. 새 환경에서는 `.env`의 `OPENAI_API_KEY`, `OPENAI_MODEL`을 설정합니다. 기존 `.env`를 덮어쓰지 마세요. 새 설치라면 `.env.example`을 `.env`로 복사합니다.
+`.env` 또는 Streamlit Cloud **Settings → Secrets**에 아래 이름으로 설정합니다. Cloud는 TOML 형식의 최상위 항목으로 입력합니다.
 
-- 화면 사용 및 테스트: [FRONTEND.md](FRONTEND.md)
-- 추후 고객 DB·Storage 연결 매뉴얼: [SUPABASE_SETUP.md](SUPABASE_SETUP.md)
-
-## 코드 구조
-
-```text
-app.py                              Streamlit 화면과 세션 상태
-src/
-  auth.py                           아이디 인증·세션·최초 비밀번호 변경
-  auth_ui.py                        로그인 화면과 문서 접근 차단
-  models.py                         입력 구조·가상 자료·예시 문안
-  ai.py                             선택적 AI 문안 작성
-  service.py                        작업 폴더·파일 검증·다운로드 ZIP
-  hwpx.py                           원본 양식에 입력·HWPX 구조 검증
-  config.py                         경로·환경 설정
-  errors.py                         화면에 표시할 오류
-templates/                          원본 HWPX 두 개 (수정 금지)
-tests/                              생성기 및 화면 회귀 테스트
-supabase/                           향후 연동용 SQL 예시
-result/                             실행별 입력 JSON·문서·검증 보고서
-pyproject.toml / uv.lock             Python 의존성 및 잠금 파일
+```toml
+OPENAI_API_KEY = "실제 키"
+OPENAI_MODEL = "gpt-6-luna"
+SUPABASE_URL = "https://YOUR_PROJECT_REF.supabase.co"
+SUPABASE_SECRET_KEY = "실제 서버 Secret 키"
 ```
 
-화면 → `service.py` → `hwpx.py`가 모두 같은 Python 프로세스에서 실행됩니다. AI는 문안 작성 버튼을 누를 때만 호출하며, 직접 작성한 문안으로도 HWPX를 생성할 수 있습니다. 다운로드 ZIP은 메모리에서 준비하고, 개별 HWPX·미리보기 TXT·검증 JSON은 요청마다 별도 `result/<UUID>/` 하위에 저장합니다.
-
-이전 Notion 웹훅·Express 예제, JavaScript 생성기와 npm 설정은 제거했습니다. `data/`의 과거 기록과 기존 결과는 보존하지만 현재 앱에서는 과거 웹훅 기록을 사용하지 않습니다. 별도 프로젝트인 `C:\dev-project\file-generator`는 변경하지 않았습니다.
-
-## 검증
+기존 `.env`를 덮어쓰지 마세요. 새 Supabase 프로젝트에서 작업 보관함을 처음 준비할 때만 실행합니다.
 
 ```powershell
-uv run pytest
+uv run python scripts/setup_guest_storage.py
 ```
 
-테스트는 실제 API나 DB에 연결하지 않습니다. 기존 JavaScript 생성기로 만든 가상 입력 3종의 문서 XML·본문·경고와 Python 출력을 비교합니다. 참조값은 `tests/fixtures/generator_reference.json`에 보관하며 정상 코드에 맞추기 위해 임의로 갱신하지 않습니다. 양식을 교체할 때는 셀 매핑·스타일·원본 해시를 함께 검증해야 합니다.
+이 명령은 비공개 `kbrand-guest-drafts` Storage 버킷만 준비합니다. 로그인용 테이블·계정이나 공개 Storage 정책은 만들지 않습니다. 기존 Publishable 키는 유지해도 되지만 이 사이트의 작업 저장에는 필요하지 않습니다. 저장 설정이 없더라도 자료 입력·문서 다운로드는 이용할 수 있습니다.
 
-## 현재 지원 범위
+## 자료와 보관
 
-- 제품 1개, 국가 최대 3개, 공장 최대 4개. 초과 입력은 중단합니다.
-- 미확인 필수값은 ‘확인 필요’로 표시하고, 결과는 검토용으로 생성합니다.
-- 사진 삽입·개인정보 동의 체크·서명·직인은 자동 작성하지 않습니다.
-- Supabase 아이디·비밀번호 로그인, 로그아웃, 최초 비밀번호 변경을 지원합니다. 실제 사용에는 로그인 테이블과 발급 계정이 필요합니다.
-- 고객 DB 저장·Storage·백그라운드 작업 큐는 아직 구현하지 않았습니다. 현재는 로컬 개발용입니다.
-- ZIP/XML·스타일 참조·셀 값 검증은 자동으로 수행합니다. 실제 한글의 표·쪽 배치는 별도로 열어 확인해야 합니다.
+- 지원: PDF, PNG/JPEG/WebP, DOCX, XLSX, PPTX, HWPX, TXT, CSV. HWP는 PDF/HWPX로 변환합니다.
+- 파일당 10MB, 한 번에 5개, 합계 25MB. 압축 문서는 압축 해제 크기도 검사합니다.
+- PDF·사진은 글자와 이미지를 모델에 전달합니다. Word/Excel/PowerPoint는 API가 읽는 텍스트·표를 바탕으로 작성하므로 포함된 사진·도표가 중요하면 PDF를 권장합니다.
+- HWPX는 텍스트를 추출해 전달합니다. HWPX 안의 사진을 분석하려면 PDF로 올립니다.
+- 원본 파일은 현재 접속 세션의 서버 메모리에서만 사용합니다. 서버 파일로 영구 저장하지 않습니다.
+- 작업 저장 시 신청서 내용·자료에서 정리한 사실·최근 대화·확인 질문을 비밀번호 기반 AES-256-GCM으로 암호화해 비공개 Storage에 저장합니다. 비밀번호는 서버 저장물에 포함하지 않습니다. 작업번호만으로 읽거나 덮어쓸 수 없습니다.
+- 생성 HWPX는 임시 폴더에서 검증 후 다운로드 바이트만 남기고 임시 폴더를 지웁니다. 저장한 작업을 다시 열어 문서를 재생성할 수 있습니다.
+- 작업 열기 이후 원본 자료를 다시 분석하려면 파일을 다시 올립니다. 같은 작업을 여러 창에서 편집하면 마지막 저장 내용이 남습니다.
+- AI API 요청은 버튼·대화 전송 때만 발생하며 `store=False`를 사용합니다. 작성 실패 시 기존 초안을 유지합니다.
+
+## 코드와 검사
+
+```text
+app.py                 업로드·대화·초안·다운로드 화면
+src/agent.py           자료 기반 추출과 대화 수정
+src/materials.py       파일 형식·크기 검사와 HWPX 텍스트 추출
+src/draft_schema.py    AI/수동 입력의 공통 데이터 구조
+src/details_ui.py      기존 전체 입력 폼을 제공하는 세부 수정창
+src/guest_work.py      작업번호·비밀번호 발급과 암호화 보관
+src/service.py         임시 HWPX 생성과 ZIP 다운로드
+src/hwpx.py            기존 원본 양식에 값 채우기·구조 검증
+templates/             원본 HWPX 두 개
+scripts/setup_guest_storage.py  비공개 작업 보관함 초기 설정
+```
+
+```powershell
+uv run --locked pytest -q
+```
+
+테스트는 실제 API·계정을 변경하지 않습니다. 업로드 검사, 잘못된 작업 비밀번호 거절, 세션 간 격리, AI 실패 시 내용 보존, 세부 정보 편집과 HWPX 생성까지 확인합니다.
+
+## 양식 범위
+
+제품 1개, 국가 최대 3개, 공장 최대 4개입니다. 여러 제품이 있는 자료에서는 신청 대상을 요청사항으로 지정합니다. 자료에 없는 인증·실적 등을 임의로 만들지 않고 확인 질문을 남깁니다. 사진·서명·직인·동의는 자동 삽입하지 않습니다. 제출 전 고객 검토 및 실제 한글의 표·쪽 배치 확인이 필요합니다.
+
+기존 `LOGIN_SETUP.md`, `SUPABASE_SETUP.md`, `supabase/` SQL은 이전 로그인 기반 설계 기록입니다. 현재 고객 사이트를 위해 실행할 필요가 없습니다.
