@@ -39,7 +39,7 @@ def storage_ready():
 def storage_client():
     config = supabase_settings()
     if not storage_ready():
-        raise DocumentError('작업 보관 기능이 아직 연결되지 않았습니다. 현재 화면에서 작성·다운로드는 계속하실 수 있습니다.')
+        raise DocumentError('문서 보관 기능이 아직 연결되지 않았습니다. 운영자에게 문의해 주세요.')
     with httpx.Client(timeout=20) as transport:
         yield create_client(config['SUPABASE_URL'], config['SUPABASE_SECRET_KEY'], options=ClientOptions(auto_refresh_token=False, persist_session=False, httpx_client=transport))
 
