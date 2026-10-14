@@ -61,6 +61,10 @@ def test_structured_file_request_preserves_input_and_has_no_storage_password():
         assert result['data']['company']['nameKo'] == data['company']['nameKo']
         sent = api.call_args.kwargs
         assert sent['store'] is False and sent['model'] == 'configured-model'
+        assert sent['reasoning'] == {'effort': 'high'}
+        assert sent['tools'] == [{'type': 'web_search', 'search_context_size': 'medium'}]
+        assert sent['max_tool_calls'] == 4
+        assert sent['include'] == ['web_search_call.action.sources']
         assert sent['input'][0]['content'][1]['type'] == 'input_file'
         assert 'test-secret' not in json.dumps(sent['input'])
         assert json.dumps(data, ensure_ascii=False) == before
@@ -77,7 +81,7 @@ def test_temporary_generation_leaves_only_download_bytes(tmp_path, monkeypatch):
     import tempfile
     monkeypatch.setattr(tempfile, 'tempdir', str(tmp_path))
     result = generate_documents(sample_data(), temporary=True)
-    assert len(result['files']) == 2 and result['zip'] and result['folder'] == ''
+    assert len(result['files']) == 5 and result['zip'] and result['folder'] == ''
     assert not list(tmp_path.iterdir())
 
 
@@ -90,3 +94,17 @@ def test_image_filename_is_included_with_image():
         content = api.call_args.kwargs['input'][0]['content']
         assert json.loads(content[1]['text'])['attachment_filename'] == '제품사진.png'
         assert content[2]['type'] == 'input_image'
+
+
+def test_search_sources_use_completed_tool_or_citation_provenance_only():
+    from src.agent import search_sources
+    source = lambda url: SimpleNamespace(url=url)
+    response = SimpleNamespace(output=[
+        SimpleNamespace(type='web_search_call', status='failed', action=SimpleNamespace(sources=[source('https://unread.example')])),
+        SimpleNamespace(type='web_search_call', status='completed', action=SimpleNamespace(sources=[
+            source('https://official.example/brand'), source('javascript:alert(1)'),
+            source('https://user:secret@example.com'), source('https://official.example/brand')])),
+        SimpleNamespace(type='message', content=[SimpleNamespace(annotations=[
+            SimpleNamespace(type='url_citation', url='https://official.example/products')])]),
+    ])
+    assert search_sources(response) == ['https://official.example/brand', 'https://official.example/products']

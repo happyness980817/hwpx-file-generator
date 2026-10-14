@@ -19,10 +19,13 @@ def test_real_generator_and_isolated_jobs(tmp_path):
         results = list(pool.map(lambda _: generate_documents(data, tmp_path), range(2)))
     assert results[0]["folder"] != results[1]["folder"]
     for result in results:
-        assert len(result["files"]) == 2
+        assert len(result["files"]) == 5
         with zipfile.ZipFile(io.BytesIO(result["zip"])) as archive:
-            assert len(archive.namelist()) == 2
+            assert len(archive.namelist()) == 5
+            assert set(archive.namelist()) == {f['name'] for f in result['files']}
         for file in result["files"]:
+            if file['name'].endswith('.xlsx'):
+                continue
             with zipfile.ZipFile(io.BytesIO(file["bytes"])) as hwpx:
                 assert hwpx.testzip() is None
                 assert hwpx.infolist()[0].filename == "mimetype"
@@ -38,7 +41,7 @@ def test_missing_company_and_no_external_runtime(tmp_path):
         generate_documents(empty_data(), tmp_path)
     with patch("subprocess.Popen", side_effect=AssertionError("External runtime forbidden")):
         result = generate_documents(sample_data(), tmp_path)
-        assert len(result["files"]) == 2
+        assert len(result["files"]) == 5
 
 
 def test_invalid_date(tmp_path):

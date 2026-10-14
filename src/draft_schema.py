@@ -2,7 +2,7 @@
 from datetime import date
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, create_model, field_validator
-from .models import empty_data, PLAN_FIELDS
+from .models import empty_data, PLAN_FIELDS, MAX_PRODUCTS, COUNTRIES
 
 
 class StrictModel(BaseModel):
@@ -23,12 +23,14 @@ Contact = text_model('Contact', _blank['contact'])
 Provider = text_model('Provider', _blank['provider'])
 Country = text_model('Country', ['country', 'trademarkStatus', 'trademarkNumberOrReason', 'quantity', 'method'], {'trademarkStatus': (Literal['', '등록완료', '출원중', '미출원'], ...), 'method': (Method, ...)})
 Factory = text_model('Factory', ['country', 'productionType'], {'productionType': (Production, ...)})
+Variant = text_model('Variant', ['name', 'specification'])
 Product = text_model('Product', _blank['products'][0], {
     'certificationHeld': (Literal['', '유', '무'], ...),
     'productionLocation': (Literal['', '국내생산', '해외생산', '국내/해외 병행생산'], ...),
     'productionType': (Production, ...),
-    'countries': (list[Country], Field(max_length=3)),
+    'countries': (list[Country], Field(max_length=len(COUNTRIES))),
     'factories': (list[Factory], Field(max_length=4)),
+    'variants': (list[Variant], Field(default_factory=list, max_length=50)),
 })
 Plan = text_model('Plan', PLAN_FIELDS, {
     'channels': (list[Literal['제품', '포장', '온라인몰', '홈페이지/SNS', '전시·박람회', '기타']], Field(max_length=6)),
@@ -43,7 +45,7 @@ class DocumentInput(StrictModel):
     provider: Provider
     projectType: Method
     applicationDate: str = Field(max_length=10)
-    products: list[Product] = Field(min_length=1, max_length=1)
+    products: list[Product] = Field(min_length=1, max_length=MAX_PRODUCTS)
     plan: Plan
 
     @field_validator('applicationDate')

@@ -9,7 +9,8 @@ TEMPLATES = ROOT / "templates"
 
 def settings() -> dict:
     file_values = dotenv_values(ROOT / ".env")
-    return {k: os.environ.get(k, file_values.get(k) or "") for k in ("OPENAI_API_KEY", "OPENAI_MODEL")}
+    defaults = {"OPENAI_API_KEY": "", "OPENAI_MODEL": "gpt-6-astra", "OPENAI_REASONING_EFFORT": "high"}
+    return {k: os.environ.get(k, file_values.get(k) or default) for k, default in defaults.items()}
 
 
 def supabase_settings() -> dict:

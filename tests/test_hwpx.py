@@ -1,11 +1,8 @@
-"""Regression against the independent pre-migration engine and format guards."""
+"""Pinned user templates, data identity, missing-field shading and format guards."""
 import copy
 import hashlib
 import io
-import json
-from pathlib import Path
 from unittest.mock import patch
-import xml.etree.ElementTree as ET
 import zipfile
 
 import pytest
@@ -13,39 +10,113 @@ import pytest
 from src.config import TEMPLATES
 from src.errors import DocumentError
 from src.hwpx import (
-    EXPECTED_HASH, cell_at, descendants, load_template, parse, text_of,
+    EXPECTED_HASH, YELLOW, cell_at, children, descendants, load_template, parse, text_of,
     validate_input, validate_package,
 )
-from src.models import sample_data
+from src.models import COUNTRIES, MAX_PRODUCTS, empty_data, sample_data
 from src.service import generate_documents
 
-REFERENCE = json.loads((Path(__file__).parent / 'fixtures/generator_reference.json').read_text(encoding='utf-8'))
+
+def archive_parts(file):
+    with zipfile.ZipFile(io.BytesIO(file['bytes'])) as archive:
+        return {name: archive.read(name) for name in archive.namelist()}
 
 
-@pytest.mark.parametrize('case', REFERENCE['cases'], ids=lambda c: c['name'])
-def test_matches_pre_migration_documents(case, tmp_path):
-    data = copy.deepcopy(case['data'])
+def test_new_reference_templates_preserve_unedited_parts_and_consent(tmp_path):
+    data = sample_data()
+    before = copy.deepcopy(data)
     result = generate_documents(data, tmp_path)
-    assert data == case['data']
-    for actual, report, expected in zip(result['files'], result['report']['files'], case['files'], strict=True):
-        assert actual['name'] == expected['filename']
-        assert report['warnings'] == expected['warnings']
-        assert report['validation'] == expected['validation']
-        with zipfile.ZipFile(io.BytesIO(actual['bytes'])) as archive:
-            canonical = ET.canonicalize(archive.read('Contents/section0.xml').decode('utf-8'))
-            assert hashlib.sha256(canonical.encode('utf-8')).hexdigest() == expected['sectionSHA256']
-            assert hashlib.sha256(archive.read('Preview/PrvText.txt')).hexdigest() == expected['previewSHA256']
-            kind = 'application' if '사용신청서' in actual['name'] else 'plan'
-            original = load_template(TEMPLATES / f'{kind}.hwpx', kind)
-            changed = {'Contents/section0.xml', 'Contents/content.hpf', 'META-INF/container.xml', 'Preview/PrvText.txt', 'Preview/PrvImage.png'}
-            assert 'Preview/PrvImage.png' not in archive.namelist()
-            for name, content in original.entries.items():
-                if name not in changed:
-                    assert archive.read(name) == content
-            if kind == 'application':
-                doc = parse(archive.read('Contents/section0.xml'))
-                assert text_of(cell_at(descendants(doc, 'hp:tbl'), 0, 9, 0)) == text_of(cell_at(original.tables, 0, 9, 0))
+    assert data == before
+    for actual, kind in zip(result['files'][:4], EXPECTED_HASH, strict=True):
+        entries = archive_parts(actual)
+        original = load_template(TEMPLATES / f'{kind}.hwpx', kind)
+        changed = {'Contents/section0.xml', 'Contents/header.xml', 'Contents/content.hpf',
+                   'META-INF/container.xml', 'Preview/PrvText.txt', 'Preview/PrvImage.png'}
+        assert 'Preview/PrvImage.png' not in entries
+        for name, content in original.entries.items():
+            if name not in changed:
+                assert entries[name] == content
+        if kind == 'application':
+            tables = descendants(parse(entries['Contents/section0.xml']), 'hp:tbl')
+            assert text_of(cell_at(tables, 0, 9, 0)) == text_of(cell_at(original.tables, 0, 9, 0))
     assert {p.stem: hashlib.sha256(p.read_bytes()).hexdigest() for p in TEMPLATES.glob('*.hwpx')} == EXPECTED_HASH
+
+
+@pytest.mark.parametrize('kind,index', [('pledge', 2), ('intervention', 3)])
+def test_legal_declarations_preserve_each_legal_paragraph(kind, index, tmp_path):
+    data = sample_data()
+    data['company'].update(registrationNumber='123-45-67890', representative='김대표')
+    data['applicationDate'] = '2026-10-14'
+    result = generate_documents(data, tmp_path)
+    doc = parse(archive_parts(result['files'][index])['Contents/section0.xml'])
+    original = load_template(TEMPLATES / f'{kind}.hwpx', kind)
+    output = [text_of(p) for p in descendants(doc, 'hp:p') if not descendants(p, 'hp:tbl')]
+    legal = [text_of(p) for p in descendants(original.doc, 'hp:p')
+             if not descendants(p, 'hp:tbl') and len(text_of(p).strip()) > 60]
+    assert len(legal) >= 3
+    assert all(text in output for text in legal)
+    joined = '\n'.join(output)
+    assert data['company']['nameKo'] in joined and '2026년 10월 14일' in joined
+    assert '☑' not in joined  # An agent cannot assent or sign for the customer.
+    if kind == 'intervention':
+        assert '123-45-67890' in joined
+    else:
+        assert '김대표' in joined
+        assert '[ ] 위 사항' in joined
+
+
+def cell_color(cell, header):
+    ref = cell.getAttribute('borderFillIDRef')
+    style = next(item for item in descendants(header, 'hh:borderFill') if item.getAttribute('id') == ref)
+    return [item.getAttribute('faceColor') for item in descendants(style, 'hc:winBrush')]
+
+
+def test_unknown_values_are_blank_yellow_and_known_values_remain_unshaded(tmp_path):
+    data = empty_data()
+    data['company']['nameKo'] = '실제 입력한 기업'
+    result = generate_documents(data, tmp_path)
+    entries = archive_parts(result['files'][0])
+    header = parse(entries['Contents/header.xml'])
+    tables = descendants(parse(entries['Contents/section0.xml']), 'hp:tbl')
+    company = cell_at(tables, 0, 0, 2)
+    missing_number = cell_at(tables, 0, 1, 2)
+    missing_brand = cell_at(tables, 2, 0, 1)
+    assert text_of(company) == '실제 입력한 기업' and YELLOW not in cell_color(company, header)
+    for cell in [missing_number, missing_brand]:
+        assert text_of(cell) == ''
+        assert YELLOW in cell_color(cell, header)
+    assert YELLOW in cell_color(cell_at(tables, 0, 9, 0), header)
+    assert '확인 필요' not in entries['Preview/PrvText.txt'].decode('utf-8')
+
+
+def test_multiple_products_keep_separate_country_rows_and_all_73_countries(tmp_path):
+    data = sample_data()
+    first = data['products'][0]
+    first['countries'] = [{'country': country, 'trademarkStatus':'출원중', 'trademarkNumberOrReason':f'A-{index}',
+                           'quantity':str(index + 100), 'method':'라벨'} for index, country in enumerate(COUNTRIES)]
+    second = copy.deepcopy(first)
+    second.update(brandKo='두번째 브랜드', nameKo='두번째 상품', exportScale='USD 200 / 연간',
+                  countries=[{'country':'미국', 'trademarkStatus':'등록완료', 'trademarkNumberOrReason':'B-US', 'quantity':'999', 'method':'맞춤제작'}])
+    data['products'].append(second)
+    result = generate_documents(data, tmp_path)
+    entries = archive_parts(result['files'][0])
+    tables = descendants(parse(entries['Contents/section0.xml']), 'hp:tbl')
+    assert len(tables) == 8
+    assert len(children(tables[4], 'hp:tr')) == 74
+    assert len(children(tables[7], 'hp:tr')) == 2
+    assert text_of(cell_at(tables, 1, 1, 2)) == first['nameKo']
+    assert text_of(cell_at(tables, 1, 2, 2)) == second['nameKo']
+    for index, country in enumerate(COUNTRIES, 1):
+        assert text_of(cell_at(tables, 4, index, 0)) == country
+        assert text_of(cell_at(tables, 4, index, 2)) == first['nameKo']
+        assert text_of(cell_at(tables, 4, index, 4)) == f'A-{index - 1}'
+    assert text_of(cell_at(tables, 7, 1, 1)) == second['brandKo']
+    assert text_of(cell_at(tables, 7, 1, 2)) == second['nameKo']
+    assert text_of(cell_at(tables, 7, 1, 4)) == 'B-US'
+    assert text_of(cell_at(tables, 7, 1, 5)) == '999'
+    assert text_of(cell_at(tables, 1, 3, 4)) == ''  # No invented cross-currency/period sum.
+    ids = [table.getAttribute('id') for table in tables]
+    assert len(ids) == len(set(ids))
 
 
 def test_modified_template_rejected_without_output(tmp_path):
@@ -61,9 +132,10 @@ def test_modified_template_rejected_without_output(tmp_path):
 
 
 @pytest.mark.parametrize('change, message', [
-    (lambda d: d['products'].append(copy.deepcopy(d['products'][0])), '상품 1개'),
-    (lambda d: d['products'][0].update(countries=[{}] * 4), '최대 3개'),
+    (lambda d: d.update(products=d['products'] * (MAX_PRODUCTS + 1)), '1~20개'),
+    (lambda d: d['products'][0].update(countries=[{}] * 74), '최대 73개'),
     (lambda d: d['products'][0].update(factories=[{}] * 5), '최대 4개'),
+    (lambda d: d['products'][0].update(variants=[{}] * 51), '최대 50개'),
     (lambda d: d['products'][0].update(images=['image.png']), '사진 자동 삽입'),
     (lambda d: d['plan'].update(marketing='문자\x00'), '제어문자'),
     (lambda d: d['plan'].update(marketing='문자\ud800'), '제어문자'),
@@ -92,8 +164,7 @@ def test_rejects_dtd():
 
 def test_output_validation_detects_broken_styles_and_preview(tmp_path):
     result = generate_documents(sample_data(), tmp_path)
-    with zipfile.ZipFile(io.BytesIO(result['files'][0]['bytes'])) as archive:
-        entries = {n: archive.read(n) for n in archive.namelist()}
+    entries = archive_parts(result['files'][0])
     for name, replacement, message in [
         ('Contents/section0.xml', entries['Contents/section0.xml'].replace(b'charPrIDRef="8"', b'charPrIDRef="99999"', 1), '없는 스타일'),
         ('Preview/PrvText.txt', b'wrong preview', '미리보기'),

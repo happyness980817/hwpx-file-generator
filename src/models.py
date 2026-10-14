@@ -1,6 +1,16 @@
 """Input schema, fictional examples and change detection."""
 import hashlib
 import json
+from pathlib import Path
+
+COUNTRIES = json.loads(Path(__file__).with_name('countries.json').read_text(encoding='utf-8'))
+MAX_PRODUCTS = 20
+
+
+def empty_product():
+    return {**{k: '' for k in ('brandKo', 'brandEn', 'nameKo', 'nameEn', 'category', 'exportScale',
+            'certificationHeld', 'certifications', 'trademarks', 'productionLocation', 'productionType')},
+            'countries': [], 'factories': [], 'variants': []}
 
 PLAN_FIELDS = {
     "counterfeitRisk": "위조 피해·우려",
@@ -21,7 +31,7 @@ def empty_data() -> dict:
         "manager": {"name": "", "phone": "", "email": ""},
         "provider": {"name": "", "contact": "", "phone": ""},
         "projectType": "", "applicationDate": "",
-        "products": [{**{k: "" for k in ("brandKo", "brandEn", "nameKo", "nameEn", "category", "exportScale", "certificationHeld", "certifications", "trademarks", "productionLocation", "productionType")}, "countries": [], "factories": []}],
+        "products": [empty_product()],
         "plan": {**{k: "" for k in PLAN_FIELDS}, "channels": [], "ipHistory": ""},
     }
 

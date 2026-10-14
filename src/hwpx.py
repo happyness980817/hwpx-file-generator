@@ -1,7 +1,7 @@
-"""Fill the two pinned K-brand HWPX templates using Python's ZIP/XML libraries.
+"""Fill the four pinned K-brand HWPX templates using Python's ZIP/XML libraries.
 
-Only mapped text cells are edited. Styles, section controls and other package
-parts remain intact. This validates structure, not Hancom's page rendering.
+Mapped fields, repeated product/country rows and missing-field shading are edited.
+Original legal text and unrelated package parts remain intact. This validates structure, not Hancom's page rendering.
 """
 from __future__ import annotations
 
@@ -18,11 +18,16 @@ from xml.dom import Node, minidom
 import zipfile
 
 from .errors import DocumentError
+from .models import MAX_PRODUCTS, COUNTRIES
 
 EXPECTED_HASH = {
-    'application': '53c61c99f5daffa8840b5af1c3aa5a998d9a8fb6df738b8ed55b19de975857c8',
-    'plan': 'ca22b89b730dc58248ac5f1bdf24e17b9ba33e781ce4410e7b6f27b236541e82',
+    'application': '5e54216f44b393c8f5c30f8af651d663f031a4c15429582d3db8ac4bf92c5710',
+    'plan': '043047b6298620a4ce96ef51d29f8631bc6e6177aea35d5c391780bdb4196b3a',
+    'pledge': 'fe2a8ec9cf060bd52c5688076b24511067ea0631f1fd3733c117e3cd3f59e584',
+    'intervention': '7c1fad395a0791a4bf681082ddb93720f6847f598432f0688af7e2edd89baf23',
 }
+TABLE_COUNTS = {'application': 5, 'plan': 3, 'pledge': 3, 'intervention': 2}
+YELLOW = '#FFF2CC'
 
 
 def ensure(condition, message):
@@ -81,16 +86,16 @@ def validate_input(data):
     for key in ('contact', 'manager', 'provider', 'plan'):
         ensure(data.get(key) is None or isinstance(data[key], dict), f'{key}: 객체여야 합니다.')
     products = data.get('products')
-    ensure(isinstance(products, list) and len(products) == 1, '이 버전은 상품 1개만 지원합니다. 여러 상품은 자동으로 누락시키지 않고 중단합니다.')
-    product = products[0]
-    ensure(isinstance(product, dict), 'products[0]: 객체여야 합니다.')
-    for key, maximum in (('countries', 3), ('factories', 4)):
-        rows = product.get(key)
-        ensure(rows is None or isinstance(rows, list) and len(rows) <= maximum, f'{key}: 최대 {maximum}개까지 지원합니다.')
-        for row in rows or []:
-            ensure(isinstance(row, dict), f'{key}: 각 행은 객체여야 합니다.')
-    for key in ('frontImage', 'backImage', 'images'):
-        ensure(product.get(key) in (None, '', False), '이 버전은 사진 자동 삽입을 지원하지 않습니다. 사진 입력을 무시하지 않고 중단합니다.')
+    ensure(isinstance(products, list) and 1 <= len(products) <= MAX_PRODUCTS, f'상품은 1~{MAX_PRODUCTS}개까지 지원합니다.')
+    for product in products:
+        ensure(isinstance(product, dict), 'products: 객체여야 합니다.')
+        for key, maximum in (('countries', len(COUNTRIES)), ('factories', 4), ('variants', 50)):
+            rows = product.get(key)
+            ensure(rows is None or isinstance(rows, list) and len(rows) <= maximum, f'{key}: 최대 {maximum}개까지 지원합니다.')
+            for row in rows or []:
+                ensure(isinstance(row, dict), f'{key}: 각 행은 객체여야 합니다.')
+        for key in ('frontImage', 'backImage', 'images'):
+            ensure(product.get(key) in (None, '', False), '이 버전은 사진 자동 삽입을 지원하지 않습니다. 사진 입력을 무시하지 않고 중단합니다.')
     supplied_date = data.get('applicationDate')
     if supplied_date not in (None, ''):
         try:
@@ -122,15 +127,19 @@ def load_template(path, kind):
     doc, header = parse(entries['Contents/section0.xml']), parse(entries['Contents/header.xml'])
     root = descendants(doc, 'hs:sec')[0]
     tables = descendants(root, 'hp:tbl')
-    ensure(len(tables) == (5 if kind == 'application' else 3), f'{kind}: 표 개수가 예상과 다릅니다.')
+    ensure(len(tables) == TABLE_COUNTS[kind], f'{kind}: 표 개수가 예상과 다릅니다.')
     return Template(kind, entries, doc, header, root, tables)
+
+
+class Missing(str):
+    """Carry the missing-input flag even when a cell contains checkbox labels."""
 
 
 def needed(ctx, value, label, limit=3000):
     normalized = '' if value is None or value == '' else string_value(value, label, limit)
     if not normalized:
         ctx.warnings.append(f'{label}: 확인 필요')
-        return '확인 필요'
+        return Missing('')
     return normalized
 
 
@@ -166,7 +175,44 @@ def text_run(doc, style, text):
     return run
 
 
-def set_cell(ctx, table, row, col, value):
+def shade_cell(ctx, cell):
+    ref = cell.getAttribute('borderFillIDRef')
+    cache = getattr(ctx, '_yellow_borders', {})
+    if ref not in cache:
+        styles = descendants(ctx.header, 'hh:borderFill')
+        source = next(n for n in styles if n.getAttribute('id') == ref)
+        clone = source.cloneNode(True)
+        new_id = str(max(int(n.getAttribute('id')) for n in styles) + 1)
+        clone.setAttribute('id', new_id)
+        for brush in children(clone, 'hc:fillBrush'):
+            clone.removeChild(brush)
+        brush = element(ctx.header, 'hc:fillBrush')
+        brush.appendChild(element(ctx.header, 'hc:winBrush', {'faceColor': YELLOW, 'hatchColor': '#000000', 'alpha': '0'}))
+        clone.appendChild(brush)
+        source.parentNode.appendChild(clone)
+        source.parentNode.setAttribute('itemCnt', str(len(styles) + 1))
+        cache[ref] = new_id
+        ctx._yellow_borders = cache
+    cell.setAttribute('borderFillIDRef', cache[ref])
+
+
+def yellow_style(ctx, ref):
+    cache = getattr(ctx, '_yellow_chars', {})
+    if ref not in cache:
+        styles = descendants(ctx.header, 'hh:charPr')
+        source = next(n for n in styles if n.getAttribute('id') == ref)
+        clone = source.cloneNode(True)
+        new_id = str(max(int(n.getAttribute('id')) for n in styles) + 1)
+        clone.setAttribute('id', new_id)
+        clone.setAttribute('shadeColor', YELLOW)
+        source.parentNode.appendChild(clone)
+        source.parentNode.setAttribute('itemCnt', str(len(styles) + 1))
+        cache[ref] = new_id
+        ctx._yellow_chars = cache
+    return cache[ref]
+
+
+def set_cell(ctx, table, row, col, value, *, missing=False):
     text = string_value(value, f'셀 {table}/{row}/{col}')
     cell = cell_at(ctx.tables, table, row, col)
     sublist = children(cell, 'hp:subList')[0]
@@ -182,6 +228,8 @@ def set_cell(ctx, table, row, col, value):
         paragraph = element(ctx.doc, 'hp:p', attributes)
         paragraph.appendChild(text_run(ctx.doc, style, line))
         sublist.appendChild(paragraph)
+    if missing or isinstance(value, Missing) or not text.strip():
+        shade_cell(ctx, cell)
     ctx.updates.append(dict(table=table, row=row, col=col, text=text))
 
 
@@ -204,7 +252,45 @@ def choices(ctx, values, selected, label):
         ctx.warnings.append(f'{label}: 선택 확인 필요')
     else:
         ensure(selected in values, f'{label}: 허용값은 {", ".join(values)}입니다.')
-    return '  '.join(f'{"☑" if v == selected else "☐"} {v}' for v in values) + ('' if selected else '  (확인 필요)')
+    text = '  '.join(f'{"☑" if v == selected else "☐"} {v}' for v in values)
+    return text if selected else Missing(text)
+
+
+def resize_table_rows(table, count, *, total=False):
+    """Repeat a verified data row; preserve the header and optional total row."""
+    rows = children(table, 'hp:tr')
+    template = rows[1].cloneNode(True)
+    end = rows[-1].cloneNode(True) if total else None
+    for row in rows[1:]:
+        table.removeChild(row)
+    for index in range(count):
+        table.appendChild(template.cloneNode(True))
+    if end is not None:
+        table.appendChild(end)
+    height = 0
+    for index, row in enumerate(children(table, 'hp:tr')):
+        for cell in children(row, 'hp:tc'):
+            children(cell, 'hp:cellAddr')[0].setAttribute('rowAddr', str(index))
+        height += max(int(children(cell, 'hp:cellSz')[0].getAttribute('height')) for cell in children(row, 'hp:tc'))
+    table.setAttribute('rowCnt', str(count + 1 + int(total)))
+    children(table, 'hp:sz')[0].setAttribute('height', str(height))
+
+
+def duplicate_product_pages(ctx, count):
+    paragraphs = children(ctx.root, 'hp:p')
+    start = next(i for i, p in enumerate(paragraphs) if text_of(p).startswith('[붙임1-1]'))
+    prototype = [p.cloneNode(True) for p in paragraphs[start:]]
+    next_id = max(int(t.getAttribute('id')) for t in ctx.tables) + 1
+    for _ in range(count - 1):
+        for i, original in enumerate(prototype):
+            clone = original.cloneNode(True)
+            if i == 0:
+                clone.setAttribute('pageBreak', '1')
+            for table in descendants(clone, 'hp:tbl'):
+                table.setAttribute('id', str(next_id))
+                next_id += 1
+            ctx.root.appendChild(clone)
+    ctx.tables = descendants(ctx.root, 'hp:tbl')
 
 
 def fill_application(ctx, data):
@@ -223,41 +309,101 @@ def fill_application(ctx, data):
     set_cell(ctx, 0, 3, 2, choices(ctx, ['중소기업', '중견기업', '대기업'], company.get('category'), '기업구분'))
     set_cell(ctx, 0, 10, 2, choices(ctx, ['라벨', '맞춤제작'], data.get('projectType'), '사업과제'))
     set_cell(ctx, 0, 11, 3, needed(ctx, provider.get('name'), '희망 수행업체'))
-    set_cell(ctx, 0, 12, 3, f"{needed(ctx, provider.get('contact'), '수행업체 담당자')} / {needed(ctx, provider.get('phone'), '수행업체 연락처')}")
-    # Original privacy consent at table 0, row 9, col 0 is never edited.
-    product = data['products'][0]
-    countries = product.get('countries') or [{}]
-    country_names = ', '.join(needed(ctx, n.get('country'), '사용국가') for n in countries)
-    scale = needed(ctx, product.get('exportScale'), '수출규모(단위·기간 포함)')
-    for col, key, label in [(1, 'brandKo', '브랜드 국문'), (2, 'nameKo', '상품 국문')]:
-        set_cell(ctx, 1, 1, col, needed(ctx, product.get(key), label))
-    set_cell(ctx, 1, 1, 3, country_names)
-    set_cell(ctx, 1, 1, 4, scale)
-    set_cell(ctx, 1, 6, 4, scale)
+    set_cell(ctx, 0, 12, 3, f"{needed(ctx, provider.get('contact'), '수행업체 담당자')} / {needed(ctx, provider.get('phone'), '수행업체 연락처')}",
+             missing=not provider.get('contact') or not provider.get('phone'))
+    shade_cell(ctx, cell_at(ctx.tables, 0, 9, 0))  # Leave consent unselected.
+    products = data['products']
+    duplicate_product_pages(ctx, len(products))
+    resize_table_rows(ctx.tables[1], len(products), total=True)
+    for index, product in enumerate(products):
+        names = ', '.join(row.get('country', '') for row in product.get('countries', []) if row.get('country'))
+        for col, value, label in [(0, str(index + 1), '번호'), (1, product.get('brandKo'), '브랜드명'),
+                                   (2, product.get('nameKo'), '상품명'), (3, names, '사용국가'),
+                                   (4, product.get('exportScale'), '수출규모(단위·기간 포함)')]:
+            set_cell(ctx, 1, index + 1, col, needed(ctx, value, label))
+        fill_product(ctx, product, 2 + index * 3)
+    # Different currencies/periods cannot be summed without additional input.
+    total = products[0].get('exportScale') if len(products) == 1 else ''
+    set_cell(ctx, 1, len(products) + 1, 4, needed(ctx, total, '수출규모 합계(동일 기간·통화 확인)'))
+    headings = [p for p in children(ctx.root, 'hp:p') if not descendants(p, 'hp:tbl') and text_of(p).startswith('[붙임1-1]')]
+    for index, (paragraph, product) in enumerate(zip(headings, products, strict=True)):
+        write_paragraph(ctx, paragraph, f"[붙임1-1] 상품별 세부정보 {index + 1} ({product.get('nameKo', '')})")
+    fill_footer(ctx, data)
+
+
+def fill_product(ctx, product, first):
     for row, col, key, label in [
         (0, 1, 'brandKo', '브랜드 국문'), (0, 3, 'brandEn', '브랜드 영문'),
         (1, 1, 'nameKo', '상품 국문'), (1, 3, 'nameEn', '상품 영문'),
         (2, 1, 'category', '상품분류'), (5, 1, 'certifications', '보유인증'), (6, 1, 'trademarks', '상표현황'),
     ]:
-        set_cell(ctx, 2, row, col, needed(ctx, product.get(key), label))
-    set_cell(ctx, 2, 3, 1, '상품 전면·후면 사진 첨부 필요')
-    ctx.warnings.append('사진 자동 삽입 미구현: 한글에서 상품 전면·후면 사진을 추가해야 합니다.')
-    set_cell(ctx, 2, 4, 1, choices(ctx, ['유', '무'], product.get('certificationHeld'), '인증 보유 여부'))
-    set_cell(ctx, 3, 0, 1, choices(ctx, ['국내생산', '해외생산', '국내/해외 병행생산'], product.get('productionLocation'), '생산지'))
-    set_cell(ctx, 3, 1, 1, choices(ctx, ['자체생산', '위탁생산(OEM/ODM)', '자체/위탁 병행생산'], product.get('productionType'), '생산형태'))
+        set_cell(ctx, first, row, col, needed(ctx, product.get(key), label))
+    set_cell(ctx, first, 3, 1, '', missing=True)
+    ctx.warnings.append('상품 전면·후면 사진과 증빙서류는 제출 전 첨부해 주세요.')
+    set_cell(ctx, first, 4, 1, choices(ctx, ['유', '무'], product.get('certificationHeld'), '인증 보유 여부'))
+    set_cell(ctx, first + 1, 0, 1, choices(ctx, ['국내생산', '해외생산', '국내/해외 병행생산'], product.get('productionLocation'), '생산지'))
+    set_cell(ctx, first + 1, 1, 1, choices(ctx, ['자체생산', '위탁생산(OEM/ODM)', '자체/위탁 병행생산'], product.get('productionType'), '생산형태'))
     for i, factory in enumerate(product.get('factories') or [{}]):
-        set_cell(ctx, 3, 3 + i, 1, str(i + 1))
-        set_cell(ctx, 3, 3 + i, 2, needed(ctx, factory.get('country'), '공장 제조국'))
-        set_cell(ctx, 3, 3 + i, 3, needed(ctx, factory.get('productionType'), '공장 생산형태'))
+        set_cell(ctx, first + 1, 3 + i, 1, str(i + 1))
+        set_cell(ctx, first + 1, 3 + i, 2, needed(ctx, factory.get('country'), '공장 제조국'))
+        set_cell(ctx, first + 1, 3 + i, 3, needed(ctx, factory.get('productionType'), '공장 생산형태'))
+    countries = product.get('countries') or [{}]
+    resize_table_rows(ctx.tables[first + 2], len(countries))
     for i, country in enumerate(countries):
         for col, value, label in [(0, country.get('country'), '사용국가'), (1, product.get('brandKo'), '브랜드'), (2, product.get('nameKo'), '상품')]:
-            set_cell(ctx, 4, i + 1, col, needed(ctx, value, label))
-        set_cell(ctx, 4, i + 1, 3, choices(ctx, ['등록완료', '출원중', '미출원'], country.get('trademarkStatus'), '국가별 상표상태'))
-        set_cell(ctx, 4, i + 1, 4, needed(ctx, country.get('trademarkNumberOrReason'), '상표번호/미출원 사유'))
-        set_cell(ctx, 4, i + 1, 5, needed(ctx, country.get('quantity'), '부착 예정수량'))
-        set_cell(ctx, 4, i + 1, 6, choices(ctx, ['라벨', '맞춤제작'], country.get('method'), '국가별 사용방식'))
-    set_root_paragraph(ctx, lambda s: s.startswith('[붙임1-1]'), f"[붙임1-1] 상품별 세부정보({needed(ctx, product.get('nameKo'), '상품명')})")
+            set_cell(ctx, first + 2, i + 1, col, needed(ctx, value, label))
+        set_cell(ctx, first + 2, i + 1, 3, choices(ctx, ['등록완료', '출원중', '미출원'], country.get('trademarkStatus'), '국가별 상표상태'))
+        set_cell(ctx, first + 2, i + 1, 4, needed(ctx, country.get('trademarkNumberOrReason'), '상표번호/미출원 사유'))
+        set_cell(ctx, first + 2, i + 1, 5, needed(ctx, country.get('quantity'), '부착 예정수량'))
+        set_cell(ctx, first + 2, i + 1, 6, choices(ctx, ['라벨', '맞춤제작'], country.get('method'), '국가별 사용방식'))
+
+
+def write_paragraph(ctx, paragraph, text, *, missing=False, signature=False):
+    runs = children(paragraph, 'hp:run')
+    style = next((r.getAttribute('charPrIDRef') for r in runs if children(r, 'hp:t')), runs[0].getAttribute('charPrIDRef') if runs else '0')
+    for run in runs:
+        for node in children(run, 'hp:t'):
+            run.removeChild(node)
+    # Do not touch paragraph controls or legal text in nested tables.
+    if signature:
+        paragraph.appendChild(text_run(ctx.doc, yellow_style(ctx, style) if missing else style, text))
+        paragraph.appendChild(text_run(ctx.doc, yellow_style(ctx, style), '                 (직인)'))
+    else:
+        paragraph.appendChild(text_run(ctx.doc, yellow_style(ctx, style) if missing else style, text))
+
+
+def fill_footer(ctx, data):
+    company = data['company']
+    for p in descendants(ctx.doc, 'hp:p'):
+        if descendants(p, 'hp:tbl'):
+            continue
+        text = text_of(p)
+        if re.fullmatch(r'\s*년\s*월\s*일\s*', text):
+            if data.get('applicationDate'):
+                year, month, day = data['applicationDate'].split('-')
+                write_paragraph(ctx, p, f'{year}년 {int(month)}월 {int(day)}일')
+            else:
+                write_paragraph(ctx, p, '        년      월      일', missing=True)
+                ctx.warnings.append('신청일: 확인 필요')
+        elif '신청기업명 :' in text:
+            write_paragraph(ctx, p, f"신청기업명 : {company['nameKo']}")
+        elif '대  표  자 :' in text:
+            write_paragraph(ctx, p, f"대  표  자 : {needed(ctx, company.get('representative'), '대표자')}", signature=True, missing=not company.get('representative'))
+        elif ctx.kind == 'intervention' and text.startswith('기업명:'):
+            write_paragraph(ctx, p, f"기업명: {company['nameKo']}")
+        elif ctx.kind == 'intervention' and text.startswith('사업자등록번호:'):
+            value = needed(ctx, company.get('registrationNumber'), '사업자등록번호')
+            write_paragraph(ctx, p, f'사업자등록번호: {value}', missing=not value)
+        elif ctx.kind == 'intervention' and text.startswith('기 업 명'):
+            write_paragraph(ctx, p, f"기 업 명   {company['nameKo']}", signature=True)
+        elif ctx.kind == 'pledge' and '[ ] 위 사항' in text:
+            write_paragraph(ctx, p, text, missing=True)
+    ctx.warnings.append('동의·서명·직인은 직접 확인하고 작성해 주세요.')
+
+
+def fill_declaration(ctx, data):
     fill_footer(ctx, data)
+
 
 
 def fill_plan(ctx, data):
@@ -274,26 +420,13 @@ def fill_plan(ctx, data):
     if selected is None:
         selected = []
     ensure(isinstance(selected, list) and all(x in allowed for x in selected), 'plan.channels에 잘못된 활용채널이 있습니다.')
-    set_cell(ctx, 1, 1, 1, '  '.join(f'{"☑" if v in selected else "☐"} {v}' for v in allowed) + ('' if selected else ' (확인 필요)'))
+    set_cell(ctx, 1, 1, 1, '  '.join(f'{"☑" if v in selected else "☐"} {v}' for v in allowed), missing=not selected)
     if not selected:
         ctx.warnings.append('활용채널: 선택 확인 필요')
-    set_cell(ctx, 2, 0, 1, '타사의 선행 IP 무단침해/카피 분쟁 요소가 있었습니까?\n' + choices(ctx, ['없음', '있음'], plan.get('ipHistory'), '분쟁 이력'))
-    set_root_paragraph(ctx, lambda s: '회색 안내문은' in s, '검토용 초안 · 제안 문안 및 확인 필요 항목은 고객사 확인 후 확정')
+    set_cell(ctx, 2, 0, 1, '타사의 선행 IP 무단침해/카피 분쟁 요소가 있었습니까?\n' + choices(ctx, ['없음', '있음'], plan.get('ipHistory'), '분쟁 이력'), missing=not plan.get('ipHistory'))
+    guide = next(p for p in children(ctx.root, 'hp:p') if not descendants(p, 'hp:tbl') and '회색 안내문은' in text_of(p))
+    ctx.root.removeChild(guide)
     fill_footer(ctx, data)
-
-
-def fill_footer(ctx, data):
-    company = data['company']
-    application = ctx.kind == 'application'
-    set_root_paragraph(ctx, lambda s: s.startswith('[붙임1]' if application else '[붙임2]'), '[검토용] 사용신청서 · 입력자료 미검증' if application else '[검토용] 활용계획서 · 고객사 확인 전')
-    set_root_paragraph(ctx, lambda s: '신청기업명 :' in s, f"               신청기업명 : {needed(ctx, company.get('nameKo'), '기업명')}")
-    set_root_paragraph(ctx, lambda s: '대  표  자 :' in s, f"                       대  표  자 : {needed(ctx, company.get('representative'), '대표자')}    (직인)")
-    if data.get('applicationDate'):
-        year, month, day = data['applicationDate'].split('-')
-        set_root_paragraph(ctx, lambda s: re.fullmatch(r'\s*년\s*월\s*일\s*', s), f'{year}년 {int(month)}월 {int(day)}일')
-    else:
-        ctx.warnings.append('신청일 미입력: 원본의 날짜 빈칸 유지')
-    ctx.warnings.append('고객사 개인정보 동의·서명·직인은 자동 작성하지 않았습니다.')
 
 
 def validate_package(content, updates, expected_tables):
@@ -310,7 +443,7 @@ def validate_package(content, updates, expected_tables):
         doc, header = parsed['Contents/section0.xml'], parsed['Contents/header.xml']
         tables = descendants(doc, 'hp:tbl')
         ensure(len(tables) == expected_tables, '출력 표 개수가 바뀌었습니다.')
-        refs = {key: {n.getAttribute('id') for n in descendants(header, tag)} for key, tag in [('charPrIDRef', 'hh:charPr'), ('paraPrIDRef', 'hh:paraPr'), ('styleIDRef', 'hh:style')]}
+        refs = {key: {n.getAttribute('id') for n in descendants(header, tag)} for key, tag in [('charPrIDRef', 'hh:charPr'), ('paraPrIDRef', 'hh:paraPr'), ('styleIDRef', 'hh:style'), ('borderFillIDRef', 'hh:borderFill')]}
         for node in doc.getElementsByTagName('*'):
             for key, valid in refs.items():
                 if node.hasAttribute(key):
@@ -342,7 +475,7 @@ def pack(ctx, title):
         if node.getAttribute('full-path') == 'Preview/PrvImage.png':
             node.parentNode.removeChild(node)
     preview = document_text(ctx.doc)
-    replacements = {'Contents/section0.xml': serialize(ctx.doc), 'Contents/content.hpf': serialize(hpf), 'Preview/PrvText.txt': preview.encode('utf-8'), 'META-INF/container.xml': serialize(container)}
+    replacements = {'Contents/section0.xml': serialize(ctx.doc), 'Contents/header.xml': serialize(ctx.header), 'Contents/content.hpf': serialize(hpf), 'Preview/PrvText.txt': preview.encode('utf-8'), 'META-INF/container.xml': serialize(container)}
     output = io.BytesIO()
     with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
         archive.writestr('mimetype', b'application/hwp+zip', compress_type=zipfile.ZIP_STORED)
@@ -365,15 +498,15 @@ def generate(data_path: Path, out_dir: Path, templates_dir: Path):
     validate_input(data)
     company = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', string_value(data['company']['nameKo'], '기업명', 80))
     products = []
-    for kind, label, fill in [('application', '사용신청서', fill_application), ('plan', '활용계획서', fill_plan)]:
+    for kind, label, fill in [('application', '사용신청서', fill_application), ('plan', '활용계획서', fill_plan), ('pledge', '확약서_정보제공동의서', fill_declaration), ('intervention', '제3자_부당개입_배제_확약서', fill_declaration)]:
         ctx = load_template(templates_dir / f'{kind}.hwpx', kind)
         fill(ctx, data)
         title = f'{company}_{label}_검토용'
         products.append(dict(title=title, **pack(ctx, title)))
-    # Prepare and validate BOTH documents before publishing any output files.
+    # Prepare and validate all four documents before publishing any output files.
     run_dir = out_dir / f'{datetime.now(timezone.utc):%Y%m%d_%H%M%S}_{uuid.uuid4().hex[:12]}'
     run_dir.mkdir(parents=True, exist_ok=False)
-    report = dict(generatedAt=datetime.now(timezone.utc).isoformat(), source=data.get('source'), inputSHA256=sha(input_bytes), templateSHA256=EXPECTED_HASH.copy(), engine='Python + zipfile + xml.dom.minidom (no HWP automation)', scope='한 상품 / 최대 3개 국가 / 텍스트 및 선택표시', visualValidation='생성기 자체는 렌더링하지 않음. 한컴에서 열어 표·쪽 배치 확인 필요.', files=[])
+    report = dict(generatedAt=datetime.now(timezone.utc).isoformat(), source=data.get('source'), inputSHA256=sha(input_bytes), templateSHA256=EXPECTED_HASH.copy(), engine='Python + zipfile + xml.dom.minidom (no HWP automation)', scope='최대 20개 상품 / 상품별 최대 73개 국가 / 미입력 칸 노란 표시', visualValidation='생성기 자체는 렌더링하지 않음. 한컴에서 열어 표·쪽 배치 확인 필요.', files=[])
     for product in products:
         filename = f"{product['title']}.hwpx"
         with (run_dir / filename).open('xb') as stream:

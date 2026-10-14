@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import time
 
 import streamlit as st
 
 from src.ai import ai_ready
 from src.agent import compose_from_materials
-from src.details_ui import render_details
+from src.form_ui import render_fields
 from src.errors import DocumentError
 from src.guest_work import storage_ready
 from src.materials import EXTENSIONS, prepare_materials
-from src.models import PLAN_FIELDS, empty_data, fingerprint
+from src.models import empty_data, fingerprint
 from src.password_documents import create_document, load_document, save_document
 from src.service import generate_documents
-from src.web_materials import prepare_links
 
 st.set_page_config(page_title='K-브랜드 문서', page_icon='📄', layout='wide', initial_sidebar_state='collapsed')
 st.markdown('''<style>
@@ -48,7 +48,7 @@ def initialize():
         st.session_state.pop('new_password', None)
     defaults = {'page': 'home', 'data': empty_data(), 'messages': [], 'source_notes': '',
                 'questions': [], 'source_names': [], 'revision': 0, 'uploader_revision': 0,
-                'ai_consent': False, 'writing_request': '', 'material_links': ''}
+                'ai_consent': False, 'writing_request': ''}
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
@@ -92,18 +92,11 @@ def change_data(data):
     st.session_state.pop('active_dialog', None)
 
 
-def apply_manual(data):
-    change_data(data)
-    if st.session_state.get('work_access'):
-        persist()
-
-
-def run_agent(materials, request, links=''):
+def run_agent(materials, request):
     if time.monotonic() - st.session_state.get('last_ai_at', -1000) < 5:
         raise DocumentError('잠시 후 다시 요청해 주세요.')
     st.session_state.last_ai_at = time.monotonic()
     with st.spinner('문서를 작성하고 있습니다…'):
-        materials = list(materials) + prepare_links(links)
         result = compose_from_materials(st.session_state.data, materials, request,
                                         st.session_state.source_notes, st.session_state.messages)
     change_data(result['data'])
@@ -114,8 +107,9 @@ def run_agent(materials, request, links=''):
         {'role': 'assistant', 'content': result['summary']}])
     st.session_state.messages = st.session_state.messages[-20:]
     st.session_state.source_names = list(dict.fromkeys(
-        st.session_state.source_names + [material.name for material in materials]))[-30:]
-    persist()
+        st.session_state.source_names + [material.name for material in materials] + result.get('search_sources', [])))[-30:]
+    if st.session_state.get('work_access'):
+        persist()
 
 
 def go_home():
@@ -126,20 +120,11 @@ def go_home():
     st.rerun()
 
 
-def close_dialog():
-    st.session_state.pop('active_dialog', None)
-
-
-@st.dialog('내용 수정', width='large', on_dismiss=close_dialog)
-def edit_details():
-    render_details(st.session_state.data, apply_manual)
-
-
 def render_home():
     with st.container(key='home_choices'):
         with st.container(key='home_intro'):
             st.title('K-브랜드 신청서 작성', anchor=False)
-            st.write('회사·제품 링크나 자료를 올리면 AI가 신청서 초안을 작성해 드립니다.')
+            st.write('회사·제품 자료를 올리면 신청에 필요한 문서를 작성해 드립니다.')
         new, existing = st.columns(2, gap='large')
         if new.button('새 문서 생성', icon=':material/add:', type='primary', width='stretch'):
             reset_document('editor')
@@ -177,125 +162,100 @@ def render_open():
 
 def render_editor():
     existing = bool(st.session_state.get('work_access'))
-    back, title, saved = st.columns([1, 3.6, 1.1], vertical_alignment='center')
+    back, title, saved = st.columns([1.3, 3.6, 1.1], vertical_alignment='center')
     if back.button('처음으로', icon=':material/arrow_back:'):
         go_home()
     title.subheader('문서 수정' if existing else '새 문서 생성')
     if existing:
-        dirty = st.session_state.get('saved_fingerprint') != fingerprint(payload())
-        if dirty:
-            if saved.button('저장', type='primary', width='stretch'):
+        if st.session_state.get('save_error'):
+            if saved.button('다시 저장', width='stretch'):
                 persist()
                 st.rerun()
         else:
-            saved.caption('저장됨')
+            saved.caption('자동 저장')
     if st.session_state.get('action_error'):
         st.error(st.session_state.action_error)
     if st.session_state.get('save_error'):
-        st.error('저장되지 않았습니다. 화면의 내용은 유지됩니다. 위의 저장 버튼을 눌러 주세요.')
-    left, right = st.columns([1, 1.1], gap='large')
-    with left:
-        with st.container(border=True):
-            st.subheader('자료 입력')
-            links = st.text_area('회사·제품 링크', key='material_links', max_chars=6002, height=80,
-                                 placeholder='https://', help='한 줄에 하나씩, 최대 3개')
-            uploaded = st.file_uploader('파일 첨부', type=EXTENSIONS, accept_multiple_files=True,
-                                       max_upload_size=10, key=f'materials_{st.session_state.uploader_revision}',
-                                       help='회사소개서·제품자료 등 최대 5개 / 파일당 10MB, 합계 25MB. HWP는 PDF 또는 HWPX로 저장해 주세요.')
-            request = st.text_area('요청사항 (선택)', key='writing_request', max_chars=4000,
-                                   height=80, placeholder='예: 이 제품의 일본 진출 계획을 작성해 주세요.')
-            password = ''
-            if not existing:
-                password = st.text_input('문서 비밀번호', type='password', key='new_password', max_chars=128,
-                                         placeholder='문자·숫자 조합, 10자 이상',
-                                         help='이 비밀번호로 문서를 다시 엽니다. 분실하면 복구할 수 없습니다.')
-            sources = bool(links.strip() or uploaded or request.strip())
-            consent = st.checkbox('AI 자료 분석에 동의합니다.', key='ai_consent',
-                                   help='링크 본문·첨부 자료·요청사항을 OpenAI API에 전달합니다.')
-            ready = ai_ready()
-            manual = bool(st.session_state.data['company']['nameKo'].strip())
-            can_create = (existing or bool(password)) and storage_ready() and (
-                (sources and ready and consent) or (not sources and manual))
-            if st.button('초안 다시 작성' if existing else '문서 생성', type='primary', width='stretch', disabled=not can_create):
-                st.session_state.pop('action_error', None)
-                try:
-                    materials = prepare_materials([(item.name, item.getvalue()) for item in uploaded])
-                    ensure_document(password)
-                    if sources:
-                        run_agent(materials, request, links)
-                    else:
-                        persist()
-                except DocumentError as exc:
-                    st.session_state.action_error = str(exc)
-                st.rerun()
-            if not storage_ready():
-                st.error('문서 보관 연결을 확인해 주세요.')
-            elif not ready:
-                st.caption('AI 연결 준비 중입니다. 내용을 직접 입력할 수 있습니다.')
-        if existing and st.session_state.messages:
-            st.subheader('수정 요청')
-            with st.container(height=260, border=True):
-                for message in st.session_state.messages[-8:]:
-                    with st.chat_message(message['role']):
-                        st.text(message['content'])
-            prompt = st.chat_input('수정할 내용을 말씀해 주세요.', max_chars=4000, disabled=not (ready and consent))
-            if prompt:
-                st.session_state.pop('action_error', None)
-                try:
-                    run_agent([], prompt)
-                except DocumentError as exc:
-                    st.session_state.action_error = str(exc)
-                st.rerun()
-    with right:
-        with st.container(border=True):
-            st.subheader('문서 미리보기')
-            data = st.session_state.data
-            if not data['company']['nameKo'] and not any(data['plan'][key] for key in PLAN_FIELDS):
-                st.markdown('<div class="empty-preview"><div class="paper"><hr><hr><hr></div>작성된 문서가 여기에 표시됩니다.</div>', unsafe_allow_html=True)
-            else:
-                st.text(data['company']['nameKo'] or '회사명 확인 필요')
-                st.caption(data['products'][0]['nameKo'] or '제품명 확인 필요')
-                application, plan = st.tabs(['사용신청서', '활용계획서'])
-                with application:
-                    rows = [('대표자', data['company']['representative']), ('사업자등록번호', data['company']['registrationNumber']),
-                            ('주소', data['company']['address']), ('담당자', data['contact']['name']), ('연락처', data['contact']['phone']),
-                            ('브랜드', data['products'][0]['brandKo']), ('신청국가', ', '.join(row['country'] for row in data['products'][0]['countries']))]
-                    for label, value in rows:
-                        label_col, value_col = st.columns([1, 2])
-                        label_col.caption(label)
-                        value_col.text(value or '확인 필요')
-                with plan:
-                    for key, label in PLAN_FIELDS.items():
-                        with st.expander(label, expanded=key == 'counterfeitRisk'):
-                            st.text(data['plan'][key] or '확인 필요')
-            if st.button('내용 수정' if existing else '직접 입력', width='stretch'):
-                st.session_state.active_dialog = 'details'
-            if st.session_state.questions:
-                with st.expander(f'확인할 항목 {len(st.session_state.questions)}개'):
-                    for question in st.session_state.questions:
-                        st.text('• ' + question)
-            if st.session_state.source_names:
-                with st.expander('참고 자료'):
-                    for source in st.session_state.source_names:
-                        st.text(source)
-            if existing:
-                if st.button('한글파일 만들기', type='primary', width='stretch', disabled=not data['company']['nameKo'].strip()):
-                    try:
-                        with st.spinner('파일을 만들고 있습니다…'):
-                            st.session_state.result = generate_documents(data, temporary=True)
-                    except (DocumentError, OSError) as exc:
-                        st.error(str(exc) if isinstance(exc, DocumentError) else '파일을 만들지 못했습니다. 다시 시도해 주세요.')
-                result = st.session_state.get('result')
-                if result and result['fingerprint'] == fingerprint(data):
-                    for label, item in zip(('사용신청서.hwpx', '활용계획서.hwpx'), result['files']):
-                        st.download_button(label, item['bytes'], item['name'], 'application/octet-stream', width='stretch', on_click='ignore')
-                    st.download_button('두 파일 ZIP 다운로드', result['zip'], 'K-브랜드_신청서_2종.zip', 'application/zip', width='stretch', on_click='ignore')
-                    with st.expander('제출 전 확인'):
-                        st.caption('사진·서명과 문서 배치를 확인해 주세요.')
-                        for warning in dict.fromkeys(w for item in result['report']['files'] for w in item['warnings']):
-                            st.text('• ' + warning)
-    if st.session_state.get('active_dialog') == 'details':
-        edit_details()
+        st.error('저장하지 못했습니다. 화면의 내용은 유지됩니다.')
+    st.caption('자료를 첨부하면 자동으로 채워집니다. 노란 칸만 확인해 주세요.')
+    uploaded = st.file_uploader('파일 첨부', type=EXTENSIONS, accept_multiple_files=True,
+                               max_upload_size=10, key=f'materials_{st.session_state.uploader_revision}',
+                               help='회사소개서·제품자료·인증서 등 최대 5개, 합계 25MB')
+    with st.expander('추가 요청'):
+        request = st.text_area('작성 요청', key='writing_request', max_chars=4000, height=90,
+                               placeholder='예: 첨부한 두 제품의 활용계획을 작성해 주세요.')
+    consent = st.checkbox('AI 자료 분석에 동의합니다.', key='ai_consent',
+                          help='첨부 자료와 입력 내용을 OpenAI API로 분석하고, 부족한 공개 회사·제품 정보는 웹검색으로 보완합니다.')
+    ready = ai_ready()
+    signature = fingerprint({'files': [(u.name, hashlib.sha256(u.getvalue()).hexdigest()) for u in uploaded], 'request': request})
+    has_sources = bool(uploaded or request.strip())
+    analyze_clicked = st.button('자료로 자동 채우기', type='primary', disabled=not (ready and consent and has_sources), width='stretch')
+
+    working, structure_changed = render_fields(st.session_state.data, st.session_state.revision)
+    if working != st.session_state.data:
+        if structure_changed:
+            change_data(working)
+        else:
+            st.session_state.data = copy.deepcopy(working)
+            st.session_state.pop('result', None)
+        if existing:
+            persist()
+    if structure_changed:
+        st.rerun()
+
+    if analyze_clicked:
+        st.session_state.pop('action_error', None)
+        try:
+            materials = prepare_materials([(u.name, u.getvalue()) for u in uploaded])
+            run_agent(materials, request)
+            st.session_state.analyzed_materials = signature
+        except DocumentError as exc:
+            st.session_state.action_error = str(exc)
+        st.rerun()
+
+
+    if st.session_state.questions or st.session_state.source_names:
+        with st.expander('확인 사항 및 출처'):
+            for question in st.session_state.questions:
+                st.text('• ' + question)
+            for source in st.session_state.source_names:
+                if source.startswith(('https://', 'http://')):
+                    st.link_button(source, source)
+                else:
+                    st.text(source)
+
+    password = ''
+    if not existing:
+        password = st.text_input('문서 비밀번호', type='password', key='new_password', max_chars=128,
+                                 placeholder='문자·숫자 조합, 10자 이상')
+    needs_analysis = has_sources and signature != st.session_state.get('analyzed_materials')
+    can_generate = bool(st.session_state.data['company']['nameKo'].strip()) or (needs_analysis and ready and consent)
+    label = '파일 만들기' if existing else '문서 생성'
+    if st.button(label, type='primary', width='stretch', disabled=not ((existing or bool(password)) and storage_ready() and can_generate)):
+        st.session_state.pop('action_error', None)
+        try:
+            ensure_document(password)
+            if needs_analysis and ready and consent:
+                run_agent(prepare_materials([(u.name, u.getvalue()) for u in uploaded]), request)
+                st.session_state.analyzed_materials = signature
+            persist()
+            with st.spinner('문서를 만들고 있습니다…'):
+                st.session_state.result = generate_documents(st.session_state.data, temporary=True)
+        except (DocumentError, OSError) as exc:
+            st.session_state.action_error = str(exc) if isinstance(exc, DocumentError) else '파일을 만들지 못했습니다. 다시 시도해 주세요.'
+        st.rerun()
+    if not storage_ready():
+        st.error('문서 보관 연결을 확인해 주세요.')
+    result = st.session_state.get('result')
+    if result and result['fingerprint'] == fingerprint(st.session_state.data):
+        st.download_button('필작성 문서 전체 다운로드', result['zip'], 'K-브랜드_필작성_5종.zip',
+                           'application/zip', type='primary', width='stretch', on_click='ignore')
+        with st.expander('개별 파일 다운로드'):
+            for item in result['files']:
+                st.download_button(item['name'], item['bytes'], item['name'],
+                                   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' if item['name'].endswith('.xlsx') else 'application/octet-stream',
+                                   width='stretch', on_click='ignore')
+        st.caption('서명·직인·동의 표시는 직접 확인해 주세요.')
 
 
 initialize()

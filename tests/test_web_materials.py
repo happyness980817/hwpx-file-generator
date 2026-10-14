@@ -114,7 +114,7 @@ def test_redirect_to_private_ip_is_blocked_before_connection(monkeypatch):
     conn.close.assert_called_once()
 
 
-def test_public_redirect_retains_final_source_and_http_failure_is_clear(monkeypatch):
+def test_public_redirect_retains_final_source_and_http_failure_is_clear(monkeypatch, caplog):
     monkeypatch.setattr(web, '_public_endpoints', lambda *a: endpoint('93.184.215.14'))
     conn = Mock()
     conn.getresponse.side_effect = [Response(status=302, headers={'Location':'/product'}), Response()]
@@ -127,6 +127,7 @@ def test_public_redirect_retains_final_source_and_http_failure_is_clear(monkeypa
     conn.getresponse.return_value = Response(status=403)
     with pytest.raises(DocumentError, match='1번째 링크.*HTTP 403'):
         web.prepare_links('https://example.com')
+    assert 'KBRAND_LINK_HTTP_ERROR' in caplog.text and '"status": 403' in caplog.text
 
 
 def test_dns64_public_ipv4_translation_is_allowed(monkeypatch):

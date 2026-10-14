@@ -15,6 +15,7 @@ from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 from bs4 import BeautifulSoup
 
 from .errors import DocumentError
+from .web_diagnostics import log_http_failure
 
 MAX_LINKS = 3
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
@@ -192,6 +193,7 @@ def fetch_page(url):
                         url = normalize_url(urljoin(url, location))
                         continue
                     if response.status != 200:
+                        log_http_failure(url, response)
                         raise DocumentError(f'페이지에 접근할 수 없습니다(HTTP {response.status}). 주소와 공개 여부를 확인해 주세요. ' + FALLBACK)
                     content_type = response.getheader('Content-Type', '')
                     return extract_page(url, _read_body(response, deadline), content_type)
