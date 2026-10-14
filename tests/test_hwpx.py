@@ -175,3 +175,18 @@ def test_output_validation_detects_broken_styles_and_preview(tmp_path):
                 archive.writestr(path, replacement if path == name else content, compress_type=zipfile.ZIP_STORED if path == 'mimetype' else zipfile.ZIP_DEFLATED)
         with pytest.raises(DocumentError, match=message):
             validate_package(stream.getvalue(), [], 5)
+
+
+@pytest.mark.parametrize('status', ['출원예정', '출원중', '출원완료', '등록예정', '등록중', '등록완료'])
+def test_all_requested_trademark_statuses_survive_document_generation(status, tmp_path):
+    from src.models import apply_form_defaults
+    data = apply_form_defaults(sample_data())
+    data['products'][0]['trademarks'] = status
+    data['products'][0]['countries'][0]['trademarkStatus'] = status
+    result = generate_documents(data, tmp_path)
+    entries = archive_parts(result['files'][0])
+    tables = descendants(parse(entries['Contents/section0.xml']), 'hp:tbl')
+    assert text_of(cell_at(tables, 2, 6, 1)) == status
+    assert status in text_of(cell_at(tables, 4, 1, 3))
+    assert '이노프렌즈' in text_of(cell_at(tables, 0, 11, 3))
+    assert '100만장' in text_of(cell_at(tables, 4, 1, 5))

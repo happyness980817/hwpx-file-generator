@@ -21,7 +21,7 @@ Method = Literal['', '라벨', '맞춤제작']
 Company = text_model('Company', _blank['company'], {'nameKo': (str, Field(max_length=80)), 'category': (Literal['', '중소기업', '중견기업', '대기업'], ...)})
 Contact = text_model('Contact', _blank['contact'])
 Provider = text_model('Provider', _blank['provider'])
-Country = text_model('Country', ['country', 'trademarkStatus', 'trademarkNumberOrReason', 'quantity', 'method'], {'trademarkStatus': (Literal['', '등록완료', '출원중', '미출원'], ...), 'method': (Method, ...)})
+Country = text_model('Country', ['country', 'trademarkStatus', 'trademarkNumberOrReason', 'quantity', 'method'], {'trademarkStatus': (Literal['', '출원예정', '출원중', '출원완료', '등록예정', '등록중', '등록완료', '미출원'], ...), 'method': (Method, ...)})
 Factory = text_model('Factory', ['country', 'productionType'], {'productionType': (Production, ...)})
 Variant = text_model('Variant', ['name', 'specification'])
 Product = text_model('Product', _blank['products'][0], {

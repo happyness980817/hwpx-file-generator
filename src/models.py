@@ -1,10 +1,24 @@
 """Input schema, fictional examples and change detection."""
+import copy
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 from pathlib import Path
 
-COUNTRIES = json.loads(Path(__file__).with_name('countries.json').read_text(encoding='utf-8'))
+COUNTRIES = sorted(json.loads(Path(__file__).with_name('countries.json').read_text(encoding='utf-8')))
 MAX_PRODUCTS = 20
+TRADEMARK_STATUSES = ['출원예정', '출원중', '출원완료', '등록예정', '등록중', '등록완료']
+QUANTITIES = ['1000만장', '100만장', '10만장', '10만장이하']
+DEFAULT_PROVIDER = '이노프렌즈'
+
+
+def today_kst() -> str:
+    return datetime.now(timezone(timedelta(hours=9))).date().isoformat()
+
+
+def empty_country(country: str) -> dict:
+    return {'country': country, 'trademarkStatus': '', 'trademarkNumberOrReason': '',
+            'quantity': '100만장', 'method': '라벨'}
 
 
 def empty_product():
@@ -29,11 +43,34 @@ def empty_data() -> dict:
         "company": {k: "" for k in ("nameKo", "nameEn", "registrationNumber", "representative", "address", "department", "category")},
         "contact": {"name": "", "phone": "", "email": ""},
         "manager": {"name": "", "phone": "", "email": ""},
-        "provider": {"name": "", "contact": "", "phone": ""},
-        "projectType": "", "applicationDate": "",
+        "provider": {"name": DEFAULT_PROVIDER, "contact": "", "phone": ""},
+        "projectType": "라벨", "applicationDate": today_kst(),
         "products": [empty_product()],
         "plan": {**{k: "" for k in PLAN_FIELDS}, "channels": [], "ipHistory": ""},
     }
+
+
+def apply_form_defaults(data: dict) -> dict:
+    """Apply requested operational defaults without inventing customer facts."""
+    result = copy.deepcopy(data)
+    for key, default in empty_data().items():
+        if key not in result:
+            result[key] = default
+        elif isinstance(default, dict):
+            for name, value in default.items():
+                result[key].setdefault(name, value)
+    result['provider']['name'] = DEFAULT_PROVIDER
+    result['projectType'] = result.get('projectType') or '라벨'
+    result['applicationDate'] = result.get('applicationDate') or today_kst()
+    for product in result['products']:
+        for name, value in empty_product().items():
+            product.setdefault(name, value)
+        for row in product['countries']:
+            for name, value in empty_country(row.get('country', '')).items():
+                row.setdefault(name, value)
+            row['quantity'] = row.get('quantity') or '100만장'
+            row['method'] = row.get('method') or '라벨'
+    return result
 
 
 def sample_data() -> dict:

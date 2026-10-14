@@ -352,7 +352,13 @@ def fill_product(ctx, product, first):
     for i, country in enumerate(countries):
         for col, value, label in [(0, country.get('country'), '사용국가'), (1, product.get('brandKo'), '브랜드'), (2, product.get('nameKo'), '상품')]:
             set_cell(ctx, first + 2, i + 1, col, needed(ctx, value, label))
-        set_cell(ctx, first + 2, i + 1, 3, choices(ctx, ['등록완료', '출원중', '미출원'], country.get('trademarkStatus'), '국가별 상표상태'))
+        # The original form lists three statuses; keep the customer's finer status
+        # verbatim instead of coercing an application/registration stage to completed.
+        status = country.get('trademarkStatus')
+        if status in ('출원예정', '출원완료', '등록예정', '등록중'):
+            set_cell(ctx, first + 2, i + 1, 3, status)
+        else:
+            set_cell(ctx, first + 2, i + 1, 3, choices(ctx, ['등록완료', '출원중', '미출원'], status, '국가별 상표상태'))
         set_cell(ctx, first + 2, i + 1, 4, needed(ctx, country.get('trademarkNumberOrReason'), '상표번호/미출원 사유'))
         set_cell(ctx, first + 2, i + 1, 5, needed(ctx, country.get('quantity'), '부착 예정수량'))
         set_cell(ctx, first + 2, i + 1, 6, choices(ctx, ['라벨', '맞춤제작'], country.get('method'), '국가별 사용방식'))
