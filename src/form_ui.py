@@ -8,7 +8,7 @@ import streamlit as st
 from .form_examples import CERTIFICATIONS, FIELD_PLACEHOLDERS, PLAN_PLACEHOLDERS
 from .models import (
     CHANNELS, COUNTRIES, MAX_PRODUCTS, PLAN_FIELDS, QUANTITIES, TRADEMARK_STATUSES,
-    apply_form_defaults, empty_country, empty_product,
+    apply_form_defaults, country_label, empty_country, empty_product,
 )
 
 PHONE_PREFIXES = ['010', '011', '016', '017', '018', '019', '02', '031', '032', '033',
@@ -135,9 +135,9 @@ def render_fields(data, revision):
             rows = {row['country']: row for row in product.get('countries', []) if row.get('country')}
             key = f'edit_{revision}_{prefix}_countries'
             with countries:
-                options = sorted(set(COUNTRIES + list(rows)))
+                options = sorted(set(COUNTRIES + list(rows)), key=country_label)
                 selected = st.multiselect('수출국가 :red[*]', options, default=list(rows),
-                    placeholder='국가 선택 (복수 선택 가능)', key=key)
+                    placeholder='국가 선택 (복수 선택 가능)', format_func=country_label, key=key)
                 product['countries'] = [rows.get(country, empty_country(country)) for country in selected]
                 if not selected:
                     missing.append(key)

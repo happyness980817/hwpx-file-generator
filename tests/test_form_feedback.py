@@ -8,7 +8,7 @@ from streamlit.testing.v1 import AppTest
 
 from src.form_examples import CERTIFICATIONS, PLAN_PLACEHOLDERS
 from src.form_ui import join_phone, split_phone
-from src.models import COUNTRIES, TRADEMARK_STATUSES, apply_form_defaults, empty_data
+from src.models import COUNTRIES, TRADEMARK_STATUSES, apply_form_defaults, country_label, empty_data
 
 
 HARNESS = '''
@@ -111,7 +111,7 @@ def test_country_status_and_custom_certifications_survive_product_removal():
     app = new_form(data)
     assert not app.exception
     countries = app.multiselect(key='edit_0_product0_countries')
-    assert countries.options == sorted(COUNTRIES)
+    assert countries.options == sorted(map(country_label, COUNTRIES))
     assert app.multiselect(key='edit_0_product0_certifications').options == CERTIFICATIONS + ['사용자가 받은 별도 인증']
     for select in [item for item in app.selectbox if item.label in ('상표 현황', '브랜드 상표 현황')]:
         assert select.options == ['선택'] + TRADEMARK_STATUSES
@@ -135,6 +135,16 @@ def test_new_country_defaults_and_multi_channels_are_independent():
     assert all(row['quantity'] == '100만장' and row['method'] == '라벨' for row in rows)
     app.multiselect(key='edit_0_plan_channels').set_value(['제품', '포장', '홈페이지/SNS']).run()
     assert app.session_state['data']['plan']['channels'] == ['제품', '포장', '홈페이지/SNS']
+
+
+def test_uae_uses_korean_display_sort_but_preserves_country_value():
+    app = new_form()
+    countries = app.multiselect(key='edit_0_product0_countries')
+    assert countries.options == sorted(countries.options)
+    assert '아랍에미리트(UAE)' in countries.options and 'UAE' not in countries.options
+    countries.set_value(['UAE']).run()
+    assert not app.exception
+    assert app.session_state['data']['products'][0]['countries'][0]['country'] == 'UAE'
 
 
 def test_cleared_date_stays_empty_until_validation_on_regular_reruns():

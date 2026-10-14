@@ -9,7 +9,7 @@ from streamlit.testing.v1 import AppTest
 
 from src.errors import DocumentError
 from src.form_examples import CERTIFICATIONS, PLAN_PLACEHOLDERS
-from src.models import COUNTRIES, PLAN_FIELDS, apply_form_defaults, empty_data, sample_data, today_kst
+from src.models import COUNTRIES, PLAN_FIELDS, apply_form_defaults, country_label, empty_data, sample_data, today_kst
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -60,7 +60,7 @@ def test_home_has_one_new_document_action_and_no_password_or_link_form(no_networ
     assert not any(word in label for label in labels for word in ['비밀번호', '링크', '추가 요청', 'AI 자료 분석'])
     assert not any('provider' in item.key for item in app.text_input)
     countries = app.multiselect(key='edit_0_product0_countries')
-    assert len(countries.options) == 73 and countries.options == sorted(COUNTRIES)
+    assert len(countries.options) == 73 and countries.options == sorted(map(country_label, COUNTRIES))
     no_network.assert_not_called()
 
 

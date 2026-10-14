@@ -5,7 +5,12 @@ import hashlib
 import json
 from pathlib import Path
 
-COUNTRIES = sorted(json.loads(Path(__file__).with_name('countries.json').read_text(encoding='utf-8')))
+def country_label(country: str) -> str:
+    return '아랍에미리트(UAE)' if country == 'UAE' else country
+
+
+COUNTRIES = sorted(json.loads(Path(__file__).with_name('countries.json').read_text(encoding='utf-8')),
+                   key=country_label)
 MAX_PRODUCTS = 20
 TRADEMARK_STATUSES = ['출원예정', '출원중', '출원완료', '등록예정', '등록중', '등록완료']
 QUANTITIES = ['1000만장', '100만장', '10만장', '10만장이하']
