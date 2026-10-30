@@ -50,10 +50,14 @@ SUPABASE_SECRET_KEY = "해당 프로젝트의 서버용 secret 키"
 
 ## DB에서 목록 내려받기
 
-별도 관리자 사이트를 만들 필요 없이 Supabase 관리 화면에서 내보낼 수 있습니다.
+별도 관리자 사이트를 만들 필요 없이 Supabase의 **SQL Editor**에서 내보낼 수 있습니다.
 
-- **Table Editor**에서 **application_submissions_csv**를 열고 **Export → CSV**를 선택합니다.
-- 또는 **SQL Editor**에서 아래 조회문을 실행한 뒤 결과를 CSV로 내보냅니다.
+1. 기존 프로젝트에 접근할 수 있는 **managergoal 구글 계정**으로 Supabase에 로그인합니다.
+2. 저장된 [참여기업 목록 · CSV 내려받기](https://supabase.com/dashboard/project/fxcvlugggfxsjastrguy/sql/91cc0756-c23c-4f28-96e4-f1786ca9f598) 조회문을 엽니다.
+3. SQL Editor 위쪽 도구 모음의 **Database → Row limit → No limit**를 선택한 뒤 **Run**을 누릅니다. 기본 100행 제한을 그대로 두면 일부 목록만 내려받을 수 있습니다.
+4. 조회 결과의 **Export → CSV**를 선택합니다. 저장된 신청 정보가 없으면 내보내기 버튼이 비활성화될 수 있습니다.
+
+저장된 조회문 대신 **SQL Editor → New query**에 아래 내용을 붙여넣어도 됩니다. **Table Editor**의 뷰에서는 목록을 확인하고, CSV 다운로드는 위 SQL 조회 결과에서 진행합니다.
 
 ```sql
 select *
