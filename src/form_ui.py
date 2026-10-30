@@ -59,7 +59,7 @@ def render_fields(data, revision):
                      else 'product' if prefix.startswith('product') else prefix)
             hint = placeholder or FIELD_PLACEHOLDERS.get(f'{group}.{name}', '')
             if long:
-                target[name] = st.text_area(shown_label, value=value, height=140,
+                target[name] = st.text_area(shown_label, value=value, height=110,
                     max_chars=1800, placeholder=hint, key=key)
             else:
                 target[name] = st.text_input(shown_label, value=value, placeholder=hint,
@@ -103,19 +103,15 @@ def render_fields(data, revision):
     with st.container(border=True, key='company_card'):
         st.subheader('회사 정보', anchor=False)
         grid(working['company'], [('nameKo', '회사명'), ('representative', '대표자'),
-             ('registrationNumber', '사업자등록번호'), ('address', '주소')], 'company', required=True)
-        cols = st.columns(2)
+             ('registrationNumber', '사업자등록번호')], 'company', count=3, required=True)
+        field(working['company'], 'address', '회사 주소', 'company', required=True)
+        cols = st.columns(3)
         with cols[0]:
-            field(working['contact'], 'name', '담당자', 'contact', required=True)
-            phone(working['contact'], 'contact', required=True)
+            field(working['contact'], 'name', '담당자명', 'contact', required=True)
         with cols[1]:
+            phone(working['contact'], 'contact', required=True)
+        with cols[2]:
             field(working['contact'], 'email', '이메일', 'contact', required=True)
-            supplied = working['applicationDate']
-            selected = st.date_input('신청일', value=date.fromisoformat(supplied),
-                                    format='YYYY-MM-DD', key=f'edit_{revision}_application_date')
-            working['applicationDate'] = selected.isoformat() if selected else ''
-        field(working, 'projectType', '사용방식', 'application', ['라벨', '맞춤제작'],
-              allow_blank=False, format_func=lambda item: '라벨 (권장)' if item == '라벨' else item)
         with st.expander('회사 추가 정보'):
             grid(working['company'], [('nameEn', '영문 회사명'), ('department', '담당부서'),
                  ('category', '기업구분', ['중소기업', '중견기업', '대기업'])], 'company')
@@ -127,52 +123,62 @@ def render_fields(data, revision):
         prefix = f'product{index}'
         with st.container(border=True, key=f'product_card_{index}'):
             title, action = st.columns([5, 1])
-            title.subheader(f'상품 {index + 1}', anchor=False)
+            title.subheader('상품 정보' if index == 0 else f'상품 {index + 1}', anchor=False)
+            if index == 0:
+                title.caption('상품 1')
             if len(working['products']) > 1 and action.button('삭제', key=f'remove_product_{index}', width='stretch'):
                 remove = index
             grid(product, [('brandKo', '브랜드명'), ('nameKo', '대상제품')], prefix, required=True)
-            countries, scale = st.columns([3, 2])
+            countries, certificates = st.columns(2)
             rows = {row['country']: row for row in product.get('countries', []) if row.get('country')}
             key = f'edit_{revision}_{prefix}_countries'
             with countries:
                 options = sorted(set(COUNTRIES + list(rows)), key=country_label)
                 selected = st.multiselect('수출국가 :red[*]', options, default=list(rows),
-                    placeholder='국가 선택 (복수 선택 가능)', format_func=country_label, key=key)
+                    placeholder='국가 선택', format_func=country_label, key=key)
                 product['countries'] = [rows.get(country, empty_country(country)) for country in selected]
                 if not selected:
                     missing.append(key)
-            with scale:
-                field(product, 'exportScale', '수출(예상) 규모', prefix)
-
-            cols = st.columns(2)
-            with cols[0]:
+            with certificates:
                 supplied = [item.strip() for item in re.split(r'[,;\n]', product.get('certifications', '')) if item.strip()]
                 certifications = st.multiselect('보유 인증', list(dict.fromkeys(CERTIFICATIONS + supplied)),
-                    default=supplied, accept_new_options=True, placeholder='인증 선택 또는 직접 입력',
+                    default=supplied, accept_new_options=True, placeholder='선택 또는 직접 입력',
                     key=f'edit_{revision}_{prefix}_certifications')
                 product['certifications'] = ', '.join(certifications)
                 if certifications:
                     product['certificationHeld'] = '유'
-            with cols[1]:
-                field(product, 'trademarks', '상표 현황', prefix, TRADEMARK_STATUSES)
+            field(product, 'trademarks', '기업 상표 현황', prefix, TRADEMARK_STATUSES)
 
             for row in product['countries']:
                 country_id = hashlib.sha256(row['country'].encode('utf-8')).hexdigest()[:12]
                 country_prefix = f'{prefix}_country{country_id}'
-                st.markdown(f'**{row["country"]}**')
-                cols = st.columns(2)
+                st.markdown(f'**{country_label(row["country"])}**')
+                cols = st.columns(3)
                 with cols[0]:
                     field(row, 'trademarkStatus', '브랜드 상표 현황', country_prefix, TRADEMARK_STATUSES)
-                    field(row, 'trademarkNumberOrReason', '상표번호 / 미출원 사유', country_prefix)
                 with cols[1]:
                     field(row, 'quantity', '부착 예정수량', country_prefix, QUANTITIES, allow_blank=False)
-                    field(row, 'method', '사용방식', country_prefix, ['라벨', '맞춤제작'], allow_blank=False,
+                with cols[2]:
+                    field(row, 'method', '부착 방식', country_prefix, ['라벨', '맞춤제작'], allow_blank=False,
                         format_func=lambda item: '라벨 (권장)' if item == '라벨' else item)
+                field(row, 'trademarkNumberOrReason', '상표번호 / 미출원 사유', country_prefix)
             if product['countries']:
                 st.caption('부착 예정수량은 100만장을 권장합니다. 바우처 지원 여부와 비율은 해당 사업 공고에 따라 달라집니다.')
 
+            if index == 0:
+                method, application_date = st.columns(2)
+                with method:
+                    field(working, 'projectType', '신청 방식', 'application', ['라벨', '맞춤제작'],
+                          allow_blank=False, format_func=lambda item: '라벨 (권장)' if item == '라벨' else item)
+                with application_date:
+                    supplied = working['applicationDate']
+                    selected_date = st.date_input('신청일', value=date.fromisoformat(supplied),
+                                                  format='YYYY-MM-DD', key=f'edit_{revision}_application_date')
+                    working['applicationDate'] = selected_date.isoformat() if selected_date else ''
+
             with st.expander('상품 추가 정보'):
                 grid(product, [('brandEn', '영문 브랜드명'), ('nameEn', '영문 상품명'), ('category', '상품분류'),
+                    ('exportScale', '수출(예상) 규모'),
                     ('certificationHeld', '인증 보유 여부', ['유', '무']),
                     ('productionLocation', '생산지', ['국내생산', '해외생산', '국내/해외 병행생산']),
                     ('productionType', '생산형태', ['자체생산', '위탁생산(OEM/ODM)', '자체/위탁 병행생산'])], prefix)
@@ -203,18 +209,23 @@ def render_fields(data, revision):
         working['products'].append(empty_product())
         return working, True
 
-    with st.expander('활용계획서 내용'):
+    with st.container(border=True, key='plan_card'):
+        st.subheader('활용계획', anchor=False)
         plan = working['plan']
         key = f'edit_{revision}_plan_channels'
         plan['channels'] = st.multiselect('활용채널', CHANNELS, default=plan['channels'],
             placeholder='채널 선택 (복수 선택 가능)', key=key)
         if not plan['channels']:
             missing.append(key)
+        for start in range(0, len(PLAN_FIELDS), 2):
+            row_fields = list(PLAN_FIELDS.items())[start:start + 2]
+            cols = st.columns(len(row_fields))
+            for column, (name, label) in zip(cols, row_fields):
+                with column:
+                    field(plan, name, label, 'plan', long=True, placeholder=PLAN_PLACEHOLDERS.get(name, ''))
         field(plan, 'ipHistory', '분쟁 이력', 'plan', ['없음', '있음'])
-        for name, label in PLAN_FIELDS.items():
-            field(plan, name, label, 'plan', long=True, placeholder=PLAN_PLACEHOLDERS.get(name, ''))
 
-    css = '\n'.join(f'.st-key-{key} input,.st-key-{key} textarea,.st-key-{key} [data-baseweb="select"]>div {{background-color:#fff8dc!important;}}' for key in missing)
+    css = '\n'.join(f'.st-key-{key} input,.st-key-{key} textarea,.st-key-{key} [data-baseweb="select"]>div {{background-color:#fffdf2!important;}}' for key in missing)
     css += '\ninput::placeholder,textarea::placeholder{color:#a1a1a6!important;opacity:1;} input:focus::placeholder,textarea:focus::placeholder{color:transparent!important;}'
     st.markdown('<style>' + css + '</style>', unsafe_allow_html=True)
     return working, False

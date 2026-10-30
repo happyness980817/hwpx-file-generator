@@ -61,3 +61,4 @@ class AgentDraft(StrictModel):
     summary: str = Field(max_length=1600)
     questions: list[str] = Field(max_length=15)
     source_notes: str = Field(max_length=12000)
+    edited_fields: list[str] = Field(default_factory=list, max_length=120)
