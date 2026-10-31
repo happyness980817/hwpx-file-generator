@@ -133,7 +133,7 @@ def download_application(source_names=()):
 
 
 def render_editor():
-    st.title('K-브랜드 신청서 작성', anchor=False)
+    st.title('K-브랜드 신청서 작성 (URCODE 컨설팅 사이트)', anchor=False)
     st.caption('회사 정보를 입력하고 신청서를 내려받으세요.')
     with st.container(border=True, key='materials_card'):
         st.markdown('<div class="ai-heading">AI로 작성하기 <span class="optional">(선택)</span></div>',
