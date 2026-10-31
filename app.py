@@ -98,7 +98,8 @@ def run_ai(uploaded, *, query=None, request=''):
         {'role': 'assistant', 'content': result.get('summary', '')}])[-20:]
     # Provenance stays internal; the form has no source list or research dashboard.
     st.session_state.source_names = list(dict.fromkeys(
-        st.session_state.source_names + [material.name for material in materials]
+        st.session_state.source_names +
+        [material.name for material in materials]
         + result.get('search_sources', [])))[-30:]
     questions = result.get('questions', [])
     st.session_state.ai_notice = questions[0] if questions else '신청 내용을 반영했습니다. 아래에서 확인해 주세요.'
@@ -116,24 +117,29 @@ def download_application(source_names=()):
             result = generate_documents(data, temporary=True)
         st.session_state.result = result
     # Same company in this session updates one row; another company gets its own ID.
-    company_number = ''.join(c for c in data['company']['registrationNumber'] if c.isdigit())
-    submission_id = str(uuid.uuid5(uuid.UUID(st.session_state.submission_session), company_number))
-    saved_fingerprint = fingerprint({'data': data, 'sources': list(source_names)})
+    company_number = ''.join(
+        c for c in data['company']['registrationNumber'] if c.isdigit())
+    submission_id = str(uuid.uuid5(
+        uuid.UUID(st.session_state.submission_session), company_number))
+    saved_fingerprint = fingerprint(
+        {'data': data, 'sources': list(source_names)})
     st.session_state.pop('storage_error', None)
     if st.session_state.get('saved_fingerprint') != saved_fingerprint:
         try:
             with st.spinner('신청 정보를 저장하고 있습니다…'):
-                st.session_state.receipt = save_application(data, submission_id, source_names=source_names)
+                st.session_state.receipt = save_application(
+                    data, submission_id, source_names=source_names)
             st.session_state.saved_fingerprint = saved_fingerprint
         except DocumentError:
             st.session_state.storage_error = (
                 '파일은 내려받을 수 있지만 신청 정보 저장에 실패했습니다. '
                 '다시 내려받기를 누르면 저장을 재시도합니다.')
-    render_file_download(result['zip'], 'K-브랜드_필작성_5종.zip', request_id=uuid.uuid4().hex)
+    render_file_download(
+        result['zip'], 'K-브랜드_필작성_5종.zip', request_id=uuid.uuid4().hex)
 
 
 def render_editor():
-    st.title('URCODE 컨설팅 | K-브랜드 신청서 작성', anchor=False)
+    st.title('URCODE 컨설팅  |  K-브랜드 신청서 작성', anchor=False)
     st.caption('회사 정보를 입력하고 신청서를 내려받으세요.')
     with st.container(border=True, key='materials_card'):
         st.markdown('<div class="ai-heading">AI로 작성하기 <span class="optional">(선택)</span></div>',
@@ -147,11 +153,11 @@ def render_editor():
                                        width='stretch', disabled=not ai_ready())
         st.caption('버튼을 누르면 AI가 웹에서 회사 정보를 찾아 신청서에 필요한 내용을 자동으로 채워드립니다.')
         uploaded = st.file_uploader('회사·상품 소개자료 (선택)', type=EXTENSIONS,
-                                   accept_multiple_files=True, max_upload_size=10,
-                                   label_visibility='collapsed', key='materials')
+                                    accept_multiple_files=True, max_upload_size=10,
+                                    label_visibility='collapsed', key='materials')
         request = st.text_area('AI에게 요청하기 (선택)', key='writing_request', height=110,
-                              max_chars=4000,
-                              placeholder='예) 인도 수출을 중심으로 활용계획을 작성해 주세요.')
+                               max_chars=4000,
+                               placeholder='예) 인도 수출을 중심으로 활용계획을 작성해 주세요.')
         _, request_action = st.columns([3, 1])
         with request_action:
             request_clicked = st.button('요청 반영하기', key='apply_request', width='stretch',
@@ -164,7 +170,8 @@ def render_editor():
         elif st.session_state.get('ai_notice'):
             notice.info(st.session_state.ai_notice)
 
-    working, structure_changed = render_fields(st.session_state.data, st.session_state.revision)
+    working, structure_changed = render_fields(
+        st.session_state.data, st.session_state.revision)
     if working != st.session_state.data:
         if structure_changed:
             change_data(working)
@@ -180,7 +187,8 @@ def render_editor():
         st.session_state.pop('ai_error', None)
         st.session_state.pop('ai_notice', None)
         try:
-            run_ai(uploaded, query=query.strip() if search_clicked else None, request=request)
+            run_ai(uploaded, query=query.strip()
+                   if search_clicked else None, request=request)
         except DocumentError as exc:
             st.session_state.ai_error = str(exc)
         st.rerun()
@@ -193,7 +201,7 @@ def render_editor():
                 st.session_state.source_names + [item.name for item in uploaded])))
         except (DocumentError, OSError) as exc:
             st.session_state.download_error = (str(exc) if isinstance(exc, DocumentError)
-                else '파일을 만들지 못했습니다. 다시 시도해 주세요.')
+                                               else '파일을 만들지 못했습니다. 다시 시도해 주세요.')
     if st.session_state.get('download_error'):
         st.error(st.session_state.download_error)
     if st.session_state.get('storage_error'):
